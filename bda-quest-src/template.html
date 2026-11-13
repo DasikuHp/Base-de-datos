@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#11102b">
+<title>BDA-QUEST · Bases de Datos</title>
+<style>
+:root{--ink:#100e29;--panel:#24204b;--panel2:#30285e;--line:#8068d7;--cyan:#5de8ed;--pink:#ee77cb;--gold:#ffd36e;--green:#64e3a2;--red:#ff7187;--text:#f2eeff;--muted:#bdb6e1;--shadow:0 4px 0 #09081b,0 8px 20px #0008}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:#0b0c22;color:var(--text);font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background-image:radial-gradient(circle at 15% 10%,#32235a 0,transparent 30%),radial-gradient(circle at 90% 80%,#152b54 0,transparent 35%),linear-gradient(135deg,#090b20,#171135 58%,#101c3d);background-attachment:fixed;min-height:100vh}
+code,pre,.mono,select,textarea,input{font-family:ui-monospace,Consolas,"Cascadia Mono",monospace}
+button,select,textarea,input{font-size:16px;color:var(--text)}
+button{cursor:pointer;background:#282451;border:2px solid #9886eb;padding:9px 13px;box-shadow:0 4px 0 #0b0920,inset 0 0 0 2px #423779;transition:filter .12s,transform .12s;border-radius:2px;font-family:inherit}
+button:hover:not(:disabled){filter:brightness(1.2);transform:translateY(-1px)}button:active{transform:translateY(2px);box-shadow:0 1px 0 #0b0920}button:disabled{cursor:default}
+.primary{background:#ad6931;border-color:#ffe39a;color:#1f1731;font-weight:700;box-shadow:0 4px 0 #5e2f25,inset 0 0 0 2px #e5a74c}
+.ghost{background:#181a3b;border-color:#6259ac}.danger{background:#792c54;border-color:#ff8ea7}
+.hidden{display:none!important}.small{font-size:14px;color:var(--muted)}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:3px solid #7664c5;background:linear-gradient(180deg,#292355,#171738);box-shadow:var(--shadow)}
+.logo{display:flex;align-items:center;gap:8px;cursor:pointer;background:none;border:0;box-shadow:none;padding:0}
+.chip{width:36px;height:36px;border:3px solid var(--cyan);background:linear-gradient(135deg,#5d3ea4,#201b55);display:grid;place-items:center;color:var(--gold);font-size:20px;box-shadow:0 0 12px #4de9ee55}
+.brand{font:700 15px/1.1 ui-monospace,Consolas,monospace;letter-spacing:1px;text-shadow:2px 2px #7848b9}.brand small{display:block;font-weight:400;color:var(--muted);letter-spacing:0;text-shadow:none}
+.stats{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.stat{border:2px solid #514a91;background:#131632;padding:3px 8px;color:var(--gold);font-size:15px;text-align:center;min-width:58px}.stat small{display:block;color:#aaa6d0;font-size:11px;line-height:1}
+#failBtn{padding:3px 8px;font-size:15px}#failBtn.glow{border-color:var(--pink);box-shadow:0 0 10px #ee77cb88}
+main{max-width:980px;margin:auto;padding:14px 16px 60px;outline:none}
+.hero,.qcard,.block{background:linear-gradient(180deg,#24204bee,#1a1840ee);border:3px solid #8068d7;box-shadow:var(--shadow);padding:16px;margin:12px 0}
+.hero h1{margin:0 0 6px;font:700 26px ui-monospace,Consolas,monospace;color:var(--gold);text-shadow:3px 3px #5a2f8f}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.row.big button{padding:12px 16px}
+.crumb{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sec{font:700 18px ui-monospace,Consolas,monospace;color:var(--cyan);margin:22px 0 4px;letter-spacing:1px}
+.ugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.ucard{display:grid;grid-template-columns:44px 1fr auto;grid-template-areas:"i n p" "i s s" "i b b";text-align:left;gap:2px 10px;padding:12px}
+.ucard.exam{border-color:var(--gold)}.uicon{grid-area:i;font-size:30px;color:var(--cyan);align-self:center}.uname{grid-area:n;font-weight:700}.usub{grid-area:s;font-size:13px;color:var(--muted)}
+.ubadge{grid-area:b;font-size:11px;letter-spacing:1px;color:var(--gold)}.ucard:not(.exam) .ubadge{color:var(--muted)}.upct{grid-area:p;color:var(--green);font-size:14px}
+.cases{display:grid;gap:8px}.case{background:#1b1940;border:2px solid #514a91;padding:10px 12px}.case .small{display:block}.case .row{margin:6px 0 0}.case .row button{padding:6px 10px;font-size:15px}
+.hist{margin:6px 0 0;padding-left:18px}
+.block h3{margin:0 0 8px;color:var(--gold)}.block img{display:block;max-width:100%;height:auto;background:#fff;border:2px solid #514a91;margin:6px 0 10px;border-radius:2px}
+.block pre,.code{background:#0d0c24;border:2px solid #3f3a7a;padding:10px;overflow:auto;font-size:14px;line-height:1.35;white-space:pre}
+.bx code,.q code,.feedback code,li code{background:#0d0c24;padding:1px 4px;border:1px solid #3f3a7a;font-size:.92em}
+.truco{margin-top:10px;background:#2b2140;border-left:5px solid var(--gold);padding:8px 10px;font-size:15px}
+.warn{border-color:var(--pink)}
+.qhead{display:flex;gap:6px;flex-wrap:wrap}.tag{font-size:12px;letter-spacing:1px;font-weight:700;color:#d9d1ff;background:#39336d;border:2px solid #7768c6;padding:3px 7px;display:inline-block}.ghosttag{background:none}
+.qcard h2{margin:10px 0 6px;font-size:20px}.q{font-size:18px;margin:6px 0 10px}.hint{color:var(--muted);font-size:15px}
+.opts{display:grid;gap:8px}.opt{text-align:left;padding:11px 13px;line-height:1.3}.opt.on{border-color:var(--cyan);background:#1d3b58}
+.opt small{display:block;margin-top:4px;font-size:14px;color:#e8e4ff;opacity:.9}.opt.good{background:#17684f;border-color:#79efbb}.opt.bad{background:#792c54;border-color:#ff8ea7}.opt.dim{opacity:.55}
+.match{display:grid;gap:8px}.match label{display:grid;grid-template-columns:1fr minmax(150px,1fr);gap:8px;align-items:center;background:#1b1940;border:2px solid #3f3a7a;padding:8px}
+.match select{width:100%;background:#0d0c24;border:2px solid #6259ac;padding:6px}.match small{grid-column:1/-1;color:#ffd0da}
+.match label.good{border-color:#79efbb}.match label.bad{border-color:#ff8ea7}
+.order{padding-left:0;list-style:none;display:grid;gap:6px}.order li{display:flex;justify-content:space-between;gap:8px;align-items:center;background:#1b1940;border:2px solid #3f3a7a;padding:8px}
+.order li.good{border-color:#79efbb}.order li.bad{border-color:#ff8ea7;flex-wrap:wrap}.order li small{width:100%;color:#ffd0da}.ob{display:flex;gap:4px}.ob button{padding:4px 9px}
+textarea,input{width:100%;background:#0d0c24;border:2px solid #6259ac;padding:8px;line-height:1.35}input{width:auto;min-width:180px;padding:5px 8px}
+select{background:#0d0c24;border:2px solid #6259ac;padding:4px}
+.good{outline:none}select.good,input.good{border-color:#79efbb;background:#103b30}select.bad,input.bad{border-color:#ff8ea7;background:#4a1830}
+.rules{background:#151433;border:2px dashed #6259ac;padding:8px 12px;margin:8px 0}.rules summary{cursor:pointer;color:var(--cyan);font-weight:700}.rules ol{margin:8px 0 0;padding-left:20px}.rules li{margin:4px 0;font-size:15px}
+.erline{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:14px 0;font-family:ui-monospace,Consolas,monospace}
+.ent{border:3px solid var(--text);padding:8px 12px;font-weight:700;background:#1b1940}.rombo{border:2px solid var(--gold);padding:6px 12px;transform:skewX(-12deg);color:var(--gold)}
+.line{flex:0 0 22px;height:2px;background:var(--text)}.pair{white-space:nowrap}
+.tblwrap{overflow-x:auto}table{border-collapse:collapse;width:100%}th,td{border:2px solid #3f3a7a;padding:6px 8px;text-align:center}th{background:#30285e;font-size:14px}td:first-child{text-align:left}
+.keys input[type=checkbox]{width:22px;height:22px;min-width:0;accent-color:#5de8ed}.keys td.good{background:#103b30}.keys td.bad{background:#4a1830}.keys td.na{opacity:.35}.keys td small{display:block;color:#ffd0da}
+.ddl{background:#0d0c24;border:2px solid #3f3a7a;padding:6px 0;overflow-x:auto}
+.dl .ln{display:flex;gap:10px;width:100%;text-align:left;background:none;border:0;box-shadow:none;padding:1px 10px;transform:none!important;filter:none!important;white-space:pre;color:var(--text)}
+.dl .ln:hover:not(:disabled){background:#1d1b44}.dl .num{color:#6f68a8;min-width:22px;text-align:right;font-family:ui-monospace,Consolas,monospace;font-size:14px}.dl code{font-size:14px;background:none;border:0}
+.dl.on .ln{background:#3a2a10;outline:2px solid var(--gold)}.dl .why{padding:4px 10px 8px 42px}
+.dl.found .ln{background:#103b30}.dl.missed .ln{background:#4a1830;outline:2px dashed #ff8ea7}.dl.falso .ln{background:#3a2440;text-decoration:line-through}
+.feedback{margin-top:12px;border:3px solid;padding:10px 12px}.feedback.ok{border-color:#79efbb;background:#0f3329}.feedback.ko{border-color:#ff8ea7;background:#33142a}.feedback h3{margin:0 0 6px}
+.errs{padding-left:18px}.errs li{margin:6px 0;padding:6px 8px;border-left:4px solid}.errs li.good{border-color:#79efbb}.errs li.half{border-color:var(--gold)}.errs li.bad{border-color:#ff8ea7}
+.parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:10px 0}.part{position:relative;background:#1b1940;border:2px solid #514a91;padding:10px;display:grid;overflow:hidden}.part strong{font-size:26px;color:var(--gold)}.part i{position:absolute;left:0;bottom:0;height:5px;background:var(--green)}
+.bar{display:inline-block;width:90px;height:10px;background:#131632;border:1px solid #514a91;margin-right:6px;vertical-align:middle}.bar i{display:block;height:100%;background:var(--green)}
+.flist li{margin:6px 0}.cheat li{margin:5px 0}
+@media (max-width:600px){body{font-size:16px}.brand small{display:none}.hero h1{font-size:22px}.match label{grid-template-columns:1fr}.stat{min-width:48px;padding:2px 5px}.stat small{display:none}.dl .why{padding-left:10px}}
+@media print{header,.crumb{display:none}body{background:#fff;color:#000}.block{border:1px solid #999;box-shadow:none;background:#fff;break-inside:avoid}.truco{background:#f4f4f4}.block h3{color:#000}}
+</style>
+</head>
+<body>
+<header>
+  <button class="logo" onclick="BQA.home()" aria-label="Inicio"><span class="chip">▦</span><span class="brand">BDA-QUEST<small>Bases de Datos · 1º DAW</small></span></button>
+  <div class="stats"><div class="stat">⭐ <b id="xp">0</b><small>XP</small></div><div class="stat">LV <b id="lv">1</b><small>NIVEL</small></div><div class="stat">♥ <b id="st">0</b><small>RACHA</small></div><button id="failBtn" class="stat" onclick="BQA.review()" title="Repasar fallos">♻ <b id="failCount">0</b><small>FALLOS</small></button></div>
+</header>
+<main id="main" tabindex="-1"></main>
+<script>/*DATA*/</script>
+<script>/*APP*/</script>
+</body>
+</html>

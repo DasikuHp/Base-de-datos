@@ -20,14 +20,14 @@ MECANICO (id, dni*, nombre, especialidad, sueldo)
 PIEZA (codigo*, descripcion, precio_ud, stock)
 ```
 
-**Relaciones y (min,max) — leídos de cada lado hacia el otro:**
+**Relaciones y (min,max)** (convención de los dibujos de la web: el par pegado a una entidad dice cuántas de esa le tocan a una de la otra; en el examen escribe también la frase):
 
-| Relación | Lado A → B | Lado B → A | Justificación |
-|---|---|---|---|
-| CLIENTE —posee— VEHICULO | CLIENTE (1,1) — (0,N) VEHICULO | VEHICULO (0,N)... → ver abajo | Todo vehículo tiene 1 cliente (regla 2: "pertenece siempre"); un cliente puede tener 0..N vehículos |
-| VEHICULO —sobre— REPARACION | VEHICULO (0,1) — (1,N) REPARACION | Toda reparación está sobre exactamente 1 vehículo (regla 3); un vehículo puede tener 0 reparaciones |
-| MECANICO —dirige— REPARACION | MECANICO (0,1) — (1,1) REPARACION | Cada reparación la dirige exactamente 1 mecánico (regla 6); un mecánico puede no dirigir ninguna |
-| REPARACION —utiliza— PIEZA | (0,N) — (0,N) | N:M (regla 5); atributo: **unidades** |
+| Relación | Diagrama | Lectura |
+|---|---|---|
+| CLIENTE —posee— VEHICULO | CLIENTE **(1,1)** — posee — **(0,N)** VEHICULO | Cada vehículo tiene exactamente 1 cliente (regla 2: "pertenece siempre"); un cliente tiene de 0 a N vehículos |
+| VEHICULO —sobre— REPARACION | VEHICULO **(1,1)** — sobre — **(0,N)** REPARACION | Cada reparación es sobre exactamente 1 vehículo (regla 3); un vehículo tiene de 0 a N reparaciones |
+| MECANICO —dirige— REPARACION | MECANICO **(1,1)** — dirige — **(0,N)** REPARACION | Cada reparación la dirige exactamente 1 mecánico (regla 6); un mecánico dirige de 0 a N |
+| REPARACION —utiliza— PIEZA | REPARACION **(0,N)** — utiliza — **(0,N)** PIEZA | N:M (regla 5); atributo: **unidades** |
 
 ### Tarea 1.2 — Justificación de los (min,max)
 
@@ -101,7 +101,7 @@ VNN(unidades)
 | LINEA.reparacion_id | REPARACION(id) | Sí | Forman parte de la PK compuesta |
 | LINEA.pieza_codigo | PIEZA(codigo) | Sí | Forman parte de la PK compuesta |
 
-> **Regla de oro**: min=1 en el E/R ⇒ FK con NOT NULL (VNN). min=0 ⇒ puede ser NULL.
+> **Regla de oro**: si el hijo no puede existir sin el padre ("siempre", "toda", "exactamente uno") ⇒ FK con NOT NULL (VNN). Si "puede no tener" ⇒ admite NULL.
 
 ### Tarea 2.3 — ¿numero_orden como CP?
 
@@ -111,20 +111,27 @@ VNN(unidades)
 
 ## PARTE 3 — Consultas (solución)
 
-### 3.A — Los 8 errores del DDL
+### 3.A — Los errores del DDL (corregido)
 
-| # | Sentencia | ¿Por qué está MAL? |
+> La versión anterior de esta tabla decía que había 8 errores, pero no cuadraba con el script: decía que PIEZA tenía la PK sobre un `id` inexistente (en realidad no tiene PK), y se le escapaban las PK declaradas dos veces, el UNIQUE del DNI del mecánico y el NOT NULL de `mecanico_id`. Esta es la lista completa (son 13).
+
+| # | Dónde | ¿Por qué está MAL? |
 |---|---|---|
-| 1 | `CREATE TABLE cliente` — `nif CHAR(9)` sin NOT NULL | La regla 1 dice "**todo cliente tiene NIF**" y "no puede repetirse": falta `NOT NULL` (VNN) y `UNIQUE` (C.Alt). El identificador natural no está protegido. |
-| 2 | `CREATE TABLE vehiculo` — `matricula CHAR(7)` sin UNIQUE/NOT NULL | La regla 2 dice que "no puede repetirse": falta `UNIQUE` (C.Alt). Dos vehículos con la misma matrícula serían aceptados. |
-| 3 | `CREATE TABLE vehiculo` — `cliente_id` sin FK y sin NOT NULL | Falta la `C.Aj(cliente_id) → CLIENTE(id)`. Además, la regla 2 ("pertenece **siempre**") exige `NOT NULL` (VNN). Sin la FK se pueden crear vehículos "huérfanos". |
-| 4 | `CREATE TABLE reparacion` — `fecha_entrada` sin NOT NULL | Toda reparación real tiene fecha de entrada; es un dato mínimo del enunciado (regla 3). |
-| 5 | `CREATE TABLE reparacion` — `numero_orden` sin UNIQUE | La regla 7 dice que es **único**: falta `UNIQUE` (C.Alt). |
-| 6 | `CREATE TABLE pieza` — PK declarada como `id` **que no existe** | La tabla PIEZA **no tiene columna `id`**: su identificador es `codigo`. Además `codigo VARCHAR(10)` aparece sin NOT NULL y sin PK. La PK debe declararse sobre `codigo`. |
-| 7 | `CREATE TABLE reparacion_pieza` — `PRIMARY KEY (reparacion_id)` | La PK de la tabla intermedia de una N:M debe ser **compuesta**: `(reparacion_id, pieza_codigo)`. Tal como está, una reparación solo podría usar **una** pieza (¡viola la regla 5!). Además la columna se llama `pieza_id` pero PIEZA no tiene `id` — la FK debe apuntar a `pieza(codigo)`. Y faltan las dos FKs. |
-| 8 | `ALTER TABLE reparacion ADD FOREIGN KEY (vehiculo_id) REFERENCES pieza(id)` | **La FK apunta a la tabla equivocada**: `vehiculo_id` debe referenciar `VEHICULO(id)`, no `PIEZA(id)`. Además, PIEZA no tiene columna `id`. La "existencialidad" falla: referenciarías filas de pieza donde debería haber vehículos. |
+| 1 | `cliente`: `nif CHAR(9),` | Regla 1: "todo cliente tiene NIF" y "no puede repetirse" → faltan `NOT NULL` (VNN) y `UNIQUE` (C.Alt). |
+| 2 | `vehiculo`: `id … PRIMARY KEY` **y** `PRIMARY KEY (id)` | La PK está declarada **dos veces**. Una tabla tiene una sola PK; MySQL da "Multiple primary key defined". |
+| 3 | `vehiculo`: `matricula CHAR(7),` | Regla 2: "no puede repetirse" → falta `UNIQUE` (C.Alt). |
+| 4 | `vehiculo`: `cliente_id INT,` | Falta la `FOREIGN KEY (cliente_id) REFERENCES cliente(id)` y, como el vehículo "pertenece siempre" a un cliente, debe ser `NOT NULL`. |
+| 5 | `reparacion`: `id … PRIMARY KEY` **y** `PRIMARY KEY (id)` | Igual que en vehículo: PK declarada dos veces. |
+| 6 | `reparacion`: `numero_orden VARCHAR(10) NOT NULL,` | Regla 7: es único → falta `UNIQUE` (C.Alt). NOT NULL no evita duplicados. |
+| 7 | `reparacion`: `mecanico_id INT,` | Regla 6: "exactamente un mecánico" → debe ser `NOT NULL`, y le falta su `FOREIGN KEY (mecanico_id) REFERENCES mecanico(id)`. |
+| 8 | `mecanico`: `dni CHAR(9) NOT NULL,` | Regla 6: el DNI no se repite → falta `UNIQUE` (C.Alt). |
+| 9 | `pieza` | **No tiene clave primaria**: el código la identifica (regla 4) → `codigo VARCHAR(10) PRIMARY KEY`. |
+| 10 | `reparacion_pieza`: `pieza_id INT NOT NULL,` | PIEZA se identifica por `codigo VARCHAR(10)`, no por un `id` INT → `pieza_codigo VARCHAR(10) NOT NULL`. |
+| 11 | `reparacion_pieza`: `PRIMARY KEY (reparacion_id)` | La CP de la N:M debe ser **compuesta** `(reparacion_id, pieza_codigo)`; así cada reparación solo podría usar una pieza (viola la regla 5). |
+| 12 | `reparacion_pieza` (falta) | No tiene **ninguna FK**: faltan `FOREIGN KEY (reparacion_id) REFERENCES reparacion(id)` y `FOREIGN KEY (pieza_codigo) REFERENCES pieza(codigo)`. |
+| 13 | `ALTER TABLE reparacion ADD FOREIGN KEY (vehiculo_id) REFERENCES pieza(id);` | Apunta a la **tabla equivocada** (debe ser `vehiculo(id)`), y además `pieza` no tiene columna `id`. |
 
-*(Extra: el orden de creación no provoca error aquí porque las FKs se añaden con ALTER al final, pero ojo: `reparacion_pieza` no declara FKs en su CREATE.)*
+*(La fecha de entrada sin NOT NULL es discutible: el enunciado no dice que sea obligatoria, así que no se cuenta como error.)*
 
 ### 3.B — Los 6 errores del DML (existencialidad)
 

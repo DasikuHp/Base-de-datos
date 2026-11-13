@@ -48,7 +48,7 @@ Un taller mecánico quiere gestionar sus reparaciones. Del análisis con el clie
 
 ### 3.A — DDL (varias tablas): di por qué está MAL cada sentencia
 
-> Dado el enunciado de la Parte 1, un compañero ha escrito este script. Contiene **8 errores**. En campo libre, identifica cada error y explica **por qué está mal** (la sintaxis puede ser válida: busca el error de **significado** respecto al enunciado y a las claves).
+> Dado el enunciado de la Parte 1, un compañero ha escrito este script. Contiene **13 errores** (la versión anterior decía 8, pero había más). En campo libre, identifica cada error y explica **por qué está mal** (la sintaxis puede ser válida: busca el error de **significado** respecto al enunciado y a las claves).
 
 ```sql
 CREATE TABLE cliente (
