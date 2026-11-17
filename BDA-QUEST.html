@@ -3521,7 +3521,7 @@ function paperHome() {
   const dn = ids => ids.filter(i => pc[i] !== undefined).length;
   view(`<div class="crumb"><button class="ghost" onclick="BQA.home()">← Plan</button></div><section class="hero"><h1>✏️ Modo papel</h1>
    <p>El examen es en papel: aquí lees, lo haces en el folio, y cuando acabes pulsas ✅ Corregir para ver la solución y marcar lo que tenías bien. Si te atascas: 💡 Pista (de una en una). Sale primero lo más simple (🟢) y después lo más denso (🔴). En el examen te dan un <b>E/R dibujado</b>: de ahí sacas el paso a tablas <b>escribiendo los CREATE TABLE</b> (sin consultas), validas un DDL con campo libre y haces DML de una tabla (5 sentencias con error + 1 desde cero).</p>
-   <div class="row big"><button class="primary" onclick="BQA.paperExam()">📝 Simulacro en papel (examen completo)</button></div>
+   <div class="row big"><button class="primary" onclick="BQA.paperRoute()">🪜 Ruta paso a paso (de simple a denso)</button><button onclick="BQA.paperExam()">📝 Simulacro en papel</button></div>
    <div class="row"><button class="ghost" onclick="BQA.paperPrint('')">🖨 Imprimir un examen (enunciados)</button><button class="ghost" onclick="BQA.paperPrint('sol')">🖨 …con soluciones</button></div></section>
    ${secs.map(s => `<button class="ucard" style="width:100%" onclick="BQA.paperList('${s.k}')"><span class="uicon">✏</span><span class="uname">${esc(s.t)}</span><span class="usub">${s.ids.length} ejercicios</span><span class="ubadge">PAPEL</span><span class="upct">${dn(s.ids)}/${s.ids.length}</span></button>`).join('<div style="height:8px"></div>')}`);
 }
@@ -3532,13 +3532,33 @@ function paperList(k, f) {
   view(`<div class="crumb"><button class="ghost" onclick="BQA.paper()">← Modo papel</button></div><section class="hero"><h1>${esc(s.t)}</h1><div class="row">${chips}</div>${ids.length ? `<div class="row"><button class="primary" onclick="BQA.paperOpen('${k}',0)">▶ Empezar por el primero (${ids.length})</button></div>` : '<p>Ningún ejercicio con este filtro.</p>'}</section>
    <div class="cases">${ids.map((id, i) => { const p = pc[id], m = paperMeta(id); return `<div class="case"><b>${esc(paperTitle(id))}</b> <span class="tag ghosttag">${lvlName(m.level)}</span> <span class="tag ghosttag">≈${m.min} min</span>${paperTags(id)} ${p !== undefined ? `<span class="tag">${p}%</span>` : ''}<div class="row"><button onclick="BQA.paperOpen('${k}',${i})">Abrir</button></div></div>`; }).join('')}</div>`);
 }
+
+// ---------- RUTA PASO A PASO (de lo más simple a lo más denso) ----------
+const PATH = [
+  {g: '🟢 Nivel 1 · Calentamiento (1 tabla, consultas simples)', ids: ['ddls:s1', 'dmlw:w-h-sel1', 'dmlw:w-h-sel2', 'dmlw:w-h-sel3', 'dmlr:r-upd-nowhere', 'dmlw:w-h-upd1', 'ddls:s6', 'dmlr:r-null-eq']},
+  {g: '🟢 Nivel 2 · Fácil (2 tablas, filtros y orden)', ids: ['ddls:s2', 'dmlw:w-h-sel4', 'dmlw:w-h-sel6', 'dmlr:r-quotes', 'ddlw:veterinaria', 'dmlw:w-h-sel9', 'dmlr:r-clause-order', 'ddls:s3']},
+  {g: '🟡 Nivel 3 · Medio (N:M, reflexiva, agregados)', ids: ['ddlw:academia', 'dmlw:w-h-sel5', 'dmlw:w-c-agg1', 'dmlr:r-order-asc', 'ddls:s5', 'ddls:s8', 'dmlw:w-h-grp1', 'dmlr:r-no-group', 'ddlg:biblioteca']},
+  {g: '🟡 Nivel 4 · Medio-alto (ternaria, multivalorado, HAVING)', ids: ['ddls:s9', 'ddls:s10', 'dmlw:w-c-hav1', 'dmlr:r-agg-where', 'ddlw:hotel', 'dmlw:w-h-sel13', 'dmlr:r-or-prec', 'ddlg:gimnasio']},
+  {g: '🔴 Nivel 5 · Denso (subconsultas, anidadas, E/R de varias entidades)', ids: ['dmlw:w-h-nest2', 'dmlr:r-agg-mix', 'dmlw:w-c-sub1', 'dmlr:r-filter-order', 'dmlw:w-c-filt1', 'ddlw:universidad', 'ddlg:delivery', 'dmlr:r-agg-where-min']},
+  {g: '🔴 Nivel 6 · Como el examen', ids: ['ddlw:clinica', 'ddlv:clinica', 'ddlw:festival', 'dmlw:w-c-filt2']}
+];
+const pathFlat = () => PATH.flatMap(g => g.ids);
+function paperRoute() {
+  const pc = save.paper || {}, flat = pathFlat(), done = flat.filter(i => pc[i] !== undefined).length, next = flat.findIndex(i => pc[i] === undefined);
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.paper()">← Modo papel</button></div><section class="hero"><h1>🪜 Ruta paso a paso</h1>
+   <p>De lo más simple a lo más denso, poco a poco: <b>E/R → CREATE TABLE</b>, validar DDL con campo libre y DML de una tabla (con sentencias con error). Cada paso se hace en el folio; pulsa 💡 si te atascas y ✅ Corregir para puntuarte.</p>
+   <div class="bar" style="width:100%;margin:6px 0"><i style="width:${Math.round(done / flat.length * 100)}%"></i></div><p class="small">${done} de ${flat.length} pasos hechos</p>
+   <div class="row big">${next < 0 ? '<b>🏆 ¡Ruta completada!</b>' : `<button class="primary" onclick="BQA.paperRouteGo(${next})">▶ ${done ? 'Seguir' : 'Empezar'} por el paso ${next + 1}</button>`}</div></section>
+   ${PATH.map(g => { let n = flat.indexOf(g.ids[0]); const dn = g.ids.filter(i => pc[i] !== undefined).length; return `<section class="block"><h3>${g.g} <span class="small">${dn}/${g.ids.length}</span></h3><div class="cases">${g.ids.map((id, k) => { const idx = n + k, p = pc[id], m = paperMeta(id); return `<div class="case"><b>${idx + 1}. ${esc(m.title)}</b> <span class="tag ghosttag">≈${m.min} min</span>${paperTags(id)} ${p !== undefined ? `<span class="tag">${p}%</span>` : ''}<div class="row"><button onclick="BQA.paperRouteGo(${idx})">Abrir</button></div></div>`; }).join('')}</div></section>`; }).join('')}`);
+}
+function paperRouteGo(i) { pp = {list: pathFlat(), i, sec: null, route: true, title: 'Ruta paso a paso', hint: 0, done: false, checks: new Set()}; paperShow(); }
 function paperOpen(k, i, ids, title) {
   const s = k ? paperSections().find(x => x.k === k) : null;
   pp = {list: ids || s.ids.filter(passFilter), i, sec: k, title: title || (s ? s.t : ''), hint: 0, done: false, checks: new Set()}; paperShow();
 }
 function paperShow() {
   const id = pp.list[pp.i], it = paperItem(id); pp.it = it; pp.hint = 0; pp.done = false; pp.checks = new Set();
-  view(`<div class="crumb"><button class="ghost" onclick="${pp.sec ? `BQA.paperList('${pp.sec}')` : 'BQA.paper()'}">✕ Salir</button><span class="small">${esc(pp.title)} · ${pp.i + 1}/${pp.list.length}</span></div>
+  view(`<div class="crumb"><button class="ghost" onclick="${pp.route ? 'BQA.paperRoute()' : pp.sec ? `BQA.paperList('${pp.sec}')` : 'BQA.paper()'}">✕ Salir</button><span class="small">${esc(pp.title)} · ${pp.i + 1}/${pp.list.length}</span></div>
    <section class="qcard"><div class="qhead"><span class="tag">✏ ${it.part === 5 ? 'NORMALIZACIÓN' : 'PARTE ' + it.part}</span><span class="tag ghosttag">${lvlName(it.level)} · ≈${it.min} min</span>${it.src ? `<span class="tag ghosttag">${esc(it.src)}</span>` : ''}</div>
    <h2>${it.title}</h2><div class="statement">${it.statement}</div>
    ${it.chuleta ? `<details class="rules"><summary>📋 Chuleta rápida (si la necesitas)</summary>${it.chuleta}</details>` : ''}
@@ -3570,7 +3590,7 @@ function paperNext() {
   const byPart = {}; pp.list.forEach(id => { const p = paperItem(id).part; (byPart[p] = byPart[p] || []).push(pp.scores[id] ?? 0); });
   view(`<section class="hero"><h1>${avg >= 80 ? '🏆' : avg >= 50 ? '👍' : '📚'} ${esc(pp.title)}</h1><p>Autocorrección media: <b>${avg}%</b></p>
    <div class="parts">${Object.keys(byPart).map(p => { const v = Math.round(byPart[p].reduce((a, b) => a + b, 0) / byPart[p].length); return `<div class="part"><b>${p == 5 ? 'Norm.' : 'Parte ' + p}</b><strong>${v}%</strong><i style="width:${v}%"></i></div>`; }).join('')}</div>
-   <p class="small">Tu nota de cada ejercicio queda guardada en el listado.</p><div class="row big"><button class="primary" onclick="BQA.paper()">Modo papel</button><button onclick="BQA.home()">Plan</button></div></section>`);
+   <p class="small">Tu nota de cada ejercicio queda guardada en el listado.</p><div class="row big">${pp.route ? '<button class="primary" onclick="BQA.paperRoute()">🪜 Ver la ruta</button>' : ''}<button class="primary" onclick="BQA.paper()">Modo papel</button><button onclick="BQA.home()">Plan</button></div></section>`);
 }
 function examIds(c) { return [`er:${c.id}`, `ddlg:${c.id}`, `ddlw:${c.id}`, ...shuffle(D.DMLR.filter(t => !t.noExam && dmlLevel(t) <= 3)).slice(0, 5).map(t => 'dmlr:' + t.id), 'dmlw:' + pick(D.DMLW.filter(t => dmlLevel(t) <= 3)).id]; }
 const examPool = () => ALLC().filter(c => c.tables && (c.level || 2) <= 2 && c.id !== 'huertoex');
@@ -3914,7 +3934,7 @@ function reset(){ if(confirm('¿Borrar todo el progreso y los fallos guardados?'
 
 // ---------- API para los botones ----------
 window.BQA = {
-  paper:paperHome, paperList, paperOpen, paperHint, paperCorrect, paperTick, paperAll, paperNext, paperExam, paperPrint,
+  paper:paperHome, paperRoute, paperRouteGo, paperList, paperOpen, paperHint, paperCorrect, paperTick, paperAll, paperNext, paperExam, paperPrint,
   home, planGo, pomo:pomoToggle, planSkip(i){ save.plan[i]=true; persist(); home(); }, unit:unitView, campaign, review, exam, casePart, cheats, progress, reset, check, selfOk,
   quit(){ if(!run || confirm('¿Salir? Lo contestado ya cuenta para el progreso.')) home(); },
   opt(i){ if(st.answered) return; if(st.q.type==='multi'){ st.sel.has(i)?st.sel.delete(i):st.sel.add(i); } else { st.sel = new Set([i]); }
