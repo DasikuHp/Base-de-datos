@@ -182,7 +182,7 @@ function practice(kind){
 
 // ---------- pintar cada tarea ----------
 let st = {}; // estado de la pregunta actual
-function rulesBox(c, open){ if(open && run && run.i>0 && run.list[run.i-1] && run.list[run.i-1].cs===c) open=false; return `<details class="rules" ${open?'open':''}><summary>📄 Enunciado: ${esc(c.name)} (toca para ${open?'ocultar':'ver'})</summary><ol>${c.rules.map(r=>`<li>${r}</li>`).join('')}</ol></details>`; }
+function rulesBox(c, open){ if(open && run && run.i>0 && run.list[run.i-1] && run.list[run.i-1].cs===c) open=false; return `<details class="rules" ${open?'open':''}><summary>📄 Enunciado: ${esc(c.name)} (toca para ${open?'ocultar':'ver'})</summary><ol>${c.rules.map(r=>`<li>${String(r).replace(/<\/?b>/g,'')}</li>`).join('')}</ol></details>`; }
 function task(){
   const q = run.list[run.i]; st = {q, answered:false};
   const u = unitById(q.topic);

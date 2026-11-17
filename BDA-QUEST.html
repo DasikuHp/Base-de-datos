@@ -2336,6 +2336,50 @@ BQ.DMLR = [
 {id:'r-distinct', db:'huerto', kind:'select', title:'Valores repetidos', prompt:'Debe mostrar las orientaciones que existen en las parcelas, sin repetir, ordenadas.', bad:"SELECT orientacion\nFROM Parcela\nORDER BY orientacion;", ref:"SELECT DISTINCT orientacion FROM Parcela ORDER BY orientacion", why:[['distinct'],['repet','duplicad','varias veces','sin repetir']], model:'Falta <b>DISTINCT</b>: sin él, «Sur» sale tantas veces como parcelas hay con esa orientación. Se escribe <code>SELECT DISTINCT orientacion</code>.', truco:'"Sin repetir" / "distintos" → DISTINCT.'}
 ];
 
+// BDA-QUEST · más DML: sentencias con error para revisar (DMLR) y consultas desde cero (DMLW). lvl: 1 fácil · 2 media · 3 difícil
+window.BQ = window.BQ || {};
+BQ.DMLR.push(
+{id:'r-insert-cols', lvl:1, db:'huerto', kind:'write', title:'INSERT con columnas de menos', prompt:'Debe dar de alta al vecino 67890123F, Pablo Gil (el segundo apellido no consta).', bad:"INSERT INTO Vecino\nVALUES ('67890123F', 'Pablo', 'Gil');", ref:"INSERT INTO Vecino (dni_vecino, nombre_v_vecino, apellido1_vecino) VALUES ('67890123F', 'Pablo', 'Gil')", why:[['columnas','valores','cantidad','numero','coincid','faltan','falta'],['lista','indicar','especific','nombre de las columnas']], model:'Sin lista de columnas, el INSERT exige un valor para <b>todas</b> las columnas de la tabla (4) y aquí solo hay 3: MySQL da error de recuento. Hay que indicar las columnas: <code>INSERT INTO Vecino (dni_vecino, nombre_v_vecino, apellido1_vecino) VALUES (...)</code>.', truco:'Sin lista de columnas → todos los valores, en el orden de la tabla.'},
+{id:'r-insert-fk', lvl:2, db:'huerto', kind:'write', title:'INSERT con una clave ajena que no existe', prompt:'Debe registrar una parcela de 22.50 m² orientada al Norte que pertenece al vecino 56789012E.', bad:"INSERT INTO Parcela (metros, orientacion, dni_vecino)\nVALUES (22.50, 'Norte', '56789012F');", ref:"INSERT INTO Parcela (metros, orientacion, dni_vecino) VALUES (22.50, 'Norte', '56789012E')", why:[['clave ajena','fk','foreign','no existe','referencia','integridad'],['dni','vecino','letra','erróneo','erroneo','distinto']], model:'El DNI <code>56789012F</code> <b>no existe en Vecino</b>: la <b>clave ajena</b> de Parcela exige que el vecino exista (el correcto es <code>56789012E</code>). MySQL rechaza la fila.', truco:'Una FK solo admite valores que ya existan en la tabla referenciada.'},
+{id:'r-insert-enum', lvl:2, db:'huerto', kind:'write', title:'INSERT con un valor fuera del ENUM', prompt:'Debe registrar una parcela de 22.50 m² orientada al Noreste del vecino 56789012E.', bad:"INSERT INTO Parcela (metros, orientacion, dni_vecino)\nVALUES (22.50, 'Norte-Este', '56789012E');", ref:"INSERT INTO Parcela (metros, orientacion, dni_vecino) VALUES (22.50, 'Noreste', '56789012E')", why:[['enum','valores permitidos','lista','permitid','valido','válido','dominio'],['noreste','texto','exacto']], model:'<code>orientacion</code> es un <b>ENUM</b>: solo admite los valores de su lista (Norte, Sur, Este, Oeste, Noreste, Noroeste, Sureste, Suroeste). «Norte-Este» no está: debe ser <code>\'Noreste\'</code>.', truco:'ENUM = lista cerrada de textos exactos.'},
+{id:'r-insert-dup', lvl:2, db:'huerto', kind:'write', title:'INSERT con una clave primaria repetida', prompt:'Debe dar de alta al vecino 67890123F, Pablo Gil.', bad:"INSERT INTO Vecino (dni_vecino, nombre_v_vecino, apellido1_vecino)\nVALUES ('12345678A', 'Pablo', 'Gil');", ref:"INSERT INTO Vecino (dni_vecino, nombre_v_vecino, apellido1_vecino) VALUES ('67890123F', 'Pablo', 'Gil')", why:[['duplic','repet','ya existe','ya esta','unica','único','unico'],['primaria','pk','clave','dni']], model:'El DNI <code>12345678A</code> <b>ya existe</b> (es de María García): la <b>clave primaria</b> no admite duplicados. El DNI de Pablo es <code>67890123F</code>.', truco:'La PK no se puede repetir (Duplicate entry).'},
+{id:'r-date-format', lvl:2, db:'huerto', kind:'select', title:'Fecha con el formato equivocado', prompt:'Debe mostrar los talleres celebrados en marzo de 2024 (id_taller, equipo, fecha_celebrado).', bad:"SELECT id_taller, equipo, fecha_celebrado\nFROM Taller\nWHERE fecha_celebrado BETWEEN '01-03-2024' AND '31-03-2024';", ref:"SELECT id_taller, equipo, fecha_celebrado FROM Taller WHERE fecha_celebrado BETWEEN '2024-03-01' AND '2024-03-31'", why:[['aaaa-mm-dd','año-mes-dia','ano-mes-dia','iso','formato'],['fecha','texto','comillas','compara']], model:'Las fechas en MySQL van en formato <b>AAAA-MM-DD</b> entre comillas: <code>\'2024-03-01\'</code>. <code>\'01-03-2024\'</code> no es una fecha válida para MySQL y el filtro no funciona como se espera.', truco:'Fechas: \'AAAA-MM-DD\'.'},
+{id:'r-update-broad', lvl:1, db:'instituto', kind:'write', title:'UPDATE con una condición demasiado amplia', prompt:'Debe marcar como repetidor únicamente al alumno con id 5.', bad:"UPDATE alumno\nSET es_repetidor = 'sí'\nWHERE id <= 5;", ref:"UPDATE alumno SET es_repetidor = 'sí' WHERE id = 5", why:[['<=','menor','varios','varias','todos','mas de uno','más de uno','demasiad','amplia'],['id = 5','igual','solo','unico','único','exacto']], model:'<code>id &lt;= 5</code> afecta a <b>los 5 primeros alumnos</b>, no solo al 5. Para una única fila hay que usar la igualdad sobre la clave: <code>WHERE id = 5</code>.', truco:'Una fila concreta → WHERE clave = valor.'},
+{id:'r-count-distinct', lvl:2, db:'ciclismo', kind:'select', title:'Contar valores repetidos', prompt:'Debe mostrar cuántos equipos distintos aparecen en la tabla ciclista.', bad:"SELECT COUNT(nomeq)\nFROM ciclista;", ref:"SELECT COUNT(DISTINCT nomeq) FROM ciclista", why:[['distinct','distintos','sin repetir'],['repet','duplic','cada ciclista','una vez por','100','filas']], model:'<code>COUNT(nomeq)</code> cuenta <b>una vez por ciclista</b> (con repeticiones). Para contar equipos distintos hay que usar <code>COUNT(DISTINCT nomeq)</code>.', truco:'Distintos → COUNT(DISTINCT col).'},
+{id:'r-sum-count', lvl:1, db:'ciclismo', kind:'select', title:'SUM en vez de COUNT', prompt:'Debe mostrar cuántas etapas hay.', bad:"SELECT SUM(netapa)\nFROM etapa;", ref:"SELECT COUNT(*) FROM etapa", why:[['count','contar','cuenta'],['sum','suma','numero','número','identificador','valor']], model:'<code>SUM(netapa)</code> <b>suma los números de etapa</b> (1+2+3...), no las cuenta. Para saber cuántas filas hay se usa <code>COUNT(*)</code>.', truco:'¿Cuántos? → COUNT. ¿Total de una cantidad? → SUM.'},
+{id:'r-avg-having', lvl:2, db:'ciclismo', kind:'select', title:'HAVING para filtrar filas', prompt:'Debe mostrar la edad media de los ciclistas del equipo Banesto.', bad:"SELECT AVG(edad)\nFROM ciclista\nHAVING nomeq = 'Banesto';", ref:"SELECT AVG(edad) FROM ciclista WHERE nomeq = 'Banesto'", why:[['where'],['having','agrup','grupo','fila','columna','aggregate','agregad']], model:'Un filtro sobre <b>filas</b> (nomeq = \'Banesto\') va en <b>WHERE</b>, antes de calcular la media. HAVING filtra <b>grupos</b> ya calculados y no puede usar columnas sueltas como nomeq.', truco:'WHERE filas · HAVING grupos.'},
+{id:'r-groupby-star', lvl:2, db:'ciclismo', kind:'select', title:'GROUP BY con SELECT *', prompt:'Debe mostrar cuántos ciclistas hay en cada equipo (nomeq y la cuenta).', bad:"SELECT *\nFROM ciclista\nGROUP BY nomeq;", ref:"SELECT nomeq, COUNT(*) FROM ciclista GROUP BY nomeq", why:[['count','cuenta','agregad','funcion'],['*','todas las columnas','group by','agrup']], model:'Con <code>GROUP BY</code> el SELECT solo puede llevar las columnas agrupadas y <b>funciones de agregado</b>. <code>SELECT *</code> trae columnas que no están agrupadas y falta el <code>COUNT(*)</code>: <code>SELECT nomeq, COUNT(*) ... GROUP BY nomeq</code>.', truco:'GROUP BY: solo columnas agrupadas + agregados.'},
+{id:'r-clause-where', lvl:1, db:'huerto', kind:'select', title:'WHERE detrás del ORDER BY', prompt:'Debe mostrar las parcelas de más de 25 m², de mayor a menor superficie.', bad:"SELECT *\nFROM Parcela\nORDER BY metros DESC\nWHERE metros > 25;", ref:"SELECT * FROM Parcela WHERE metros > 25 ORDER BY metros DESC", why:[['orden','antes','despues','después','posicion','posición','sintaxis','detras','detrás'],['where','order by']], model:'<b>Orden de las cláusulas</b>: WHERE va <b>antes</b> que ORDER BY (SELECT · FROM · WHERE · GROUP BY · HAVING · ORDER BY · LIMIT). Escrito así es un error de sintaxis.', truco:'SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT.'},
+{id:'r-neq-null', lvl:1, db:'instituto', kind:'select', title:'<> NULL', prompt:'Debe mostrar los alumnos que tienen teléfono.', bad:"SELECT *\nFROM alumno\nWHERE telefono <> NULL;", ref:"SELECT * FROM alumno WHERE telefono IS NOT NULL", why:[['is not null'],['null','nulo','desconocido']], model:'Igual que con «=», <b>cualquier comparación con NULL da NULL</b> y no devuelve filas. Se escribe <code>telefono IS NOT NULL</code>.', truco:'NULL: IS NULL / IS NOT NULL.'},
+{id:'r-delete-wrongcol', lvl:1, db:'huerto', kind:'write', title:'DELETE con la columna equivocada', prompt:'Debe eliminar la parcela número 5.', bad:"DELETE FROM Parcela\nWHERE metros = 5;", ref:"DELETE FROM Parcela WHERE id_parcela = 5", why:[['id_parcela','identificador','clave','numero','número'],['metros','columna','confund','superficie']], model:'La parcela «número 5» se identifica por <code>id_parcela</code>, no por <code>metros</code>. Con <code>metros = 5</code> no se borra la parcela 5 (probablemente ninguna).', truco:'Identifica la fila por su clave.'},
+{id:'r-update-percent', lvl:3, db:'huerto', kind:'write', title:'UPDATE con un porcentaje mal escrito', prompt:'Debe aumentar un 10 % los metros de la parcela 1.', bad:"UPDATE Parcela\nSET metros = 10%\nWHERE id_parcela = 1;", ref:"UPDATE Parcela SET metros = metros * 1.10 WHERE id_parcela = 1", why:[['metros * 1.1','multiplic','calcul','expresion','expresión','1.10','1.1'],['porcentaje','%','sintaxis','valor']], model:'<code>10%</code> no es una expresión SQL válida (el % es el operador resto). Un aumento del 10 % se calcula sobre el valor actual: <code>SET metros = metros * 1.10</code>.', truco:'Aumentar un X %: columna * (1 + X/100).'}
+);
+BQ.DMLR.forEach(t => { if (t.lvl === undefined) t.lvl = /having|group|count|sum|avg/i.test(t.bad) ? 2 : /where|null|update|delete/i.test(t.bad) ? 1 : 2; });
+
+BQ.DMLW.push(
+{id:'w-h-ins3', lvl:2, db:'huerto', kind:'write', src:'INSERT', title:'Inserta dos vecinos de una vez', prompt:'Da de alta, en una sola sentencia, a Pablo Gil (DNI 67890123F) y a Lucía Mora (DNI 78901234G). Indica las columnas (sin segundo apellido).', ref:"INSERT INTO Vecino (dni_vecino, nombre_v_vecino, apellido1_vecino) VALUES ('67890123F', 'Pablo', 'Gil'), ('78901234G', 'Lucía', 'Mora')", hints:['Varias filas: VALUES (...), (...).']},
+{id:'w-h-upd5', lvl:2, db:'huerto', kind:'write', src:'UPDATE con cálculo', title:'Sube un 10 % las parcelas del Sur', prompt:'Aumenta un 10 % los metros de las parcelas orientadas al Sur.', ref:"UPDATE Parcela SET metros = metros * 1.10 WHERE orientacion = 'Sur'", hints:['SET metros = metros * 1.10 y filtra por orientación.']},
+{id:'w-h-upd6', lvl:1, db:'huerto', kind:'write', src:'UPDATE', title:'Cambia la orientación de las grandes', prompt:"Cambia a 'Norte' la orientación de las parcelas de más de 30 metros.", ref:"UPDATE Parcela SET orientacion = 'Norte' WHERE metros > 30", hints:['UPDATE ... SET ... WHERE metros > 30.']},
+{id:'w-h-del5', lvl:2, db:'huerto', kind:'write', src:'DELETE con fecha', title:'Borra inscripciones antiguas', prompt:'Elimina las inscripciones con fecha de alta anterior al 1 de marzo de 2024.', ref:"DELETE FROM Se_Apunta_A WHERE fecha_alta < '2024-03-01'", hints:["Las fechas: '2024-03-01'."]},
+{id:'w-h-sel16', lvl:1, db:'huerto', kind:'select', src:'LIKE con OR', title:'Segundo apellido por R o S', prompt:'Muestra los vecinos cuyo segundo apellido empieza por R o por S.', ref:["SELECT * FROM Vecino WHERE apellido2_vecino LIKE 'R%' OR apellido2_vecino LIKE 'S%'"], hints:['Dos LIKE unidos por OR.']},
+{id:'w-h-sel17', lvl:2, db:'huerto', kind:'select', src:'GROUP BY + HAVING', title:'Orientaciones repetidas', prompt:'Cuenta cuántas parcelas hay por orientación y muestra solo las orientaciones que tienen más de una parcela.', ref:'SELECT orientacion, COUNT(*) FROM Parcela GROUP BY orientacion HAVING COUNT(*) > 1', hints:['GROUP BY orientacion y HAVING COUNT(*) > 1.']},
+{id:'w-h-sel18', lvl:1, db:'huerto', kind:'select', src:'Agregados', title:'Total y media de metros', prompt:'Calcula la superficie total de todas las parcelas y su media, redondeada a 2 decimales.', ref:'SELECT SUM(metros), ROUND(AVG(metros), 2) FROM Parcela', hints:['SUM, AVG y ROUND(valor, 2).']},
+{id:'w-h-sel19', lvl:2, db:'huerto', kind:'select', src:'ORDER BY + LIMIT', title:'Los 2 talleres más recientes', prompt:'Muestra los 2 talleres con fecha de celebración más reciente: id_taller, equipo y fecha_celebrado.', ref:'SELECT id_taller, equipo, fecha_celebrado FROM Taller ORDER BY fecha_celebrado DESC LIMIT 2', hints:['El más reciente = fecha mayor = DESC.']},
+{id:'w-h-sel20', lvl:1, db:'huerto', kind:'select', src:'LIKE', title:'Apellido que termina en z', prompt:'Muestra el DNI y el primer apellido de los monitores cuyo segundo apellido termina en z.', ref:"SELECT dni_monitor, apellido1_monitor FROM Monitor WHERE apellido2_monitor LIKE '%z'", hints:["'%z' = termina en z."]},
+{id:'w-c-sel1', lvl:1, db:'ciclismo', kind:'select', src:'WHERE con AND', title:'Jóvenes de Banesto', prompt:"Muestra el nombre y la edad de los ciclistas del equipo 'Banesto' menores de 30 años, ordenados por edad y, a igualdad, por nombre.", ref:"SELECT nombre, edad FROM ciclista WHERE nomeq = 'Banesto' AND edad < 30 ORDER BY edad, nombre", hints:['Dos condiciones con AND y dos criterios de orden.']},
+{id:'w-c-sel2', lvl:1, db:'ciclismo', kind:'select', src:'WHERE + ORDER BY', title:'Puertos altos de categoría E', prompt:"Muestra el nombre y la altura de los puertos de categoría 'E' con más de 2000 metros, de mayor a menor altura y, a igualdad, por nombre.", ref:"SELECT nompuerto, altura FROM puerto WHERE categoria = 'E' AND altura > 2000 ORDER BY altura DESC, nompuerto", hints:['ORDER BY altura DESC, nompuerto.']},
+{id:'w-c-sel3', lvl:1, db:'ciclismo', kind:'select', src:'WHERE', title:'Etapas largas', prompt:'Muestra el número, los km, la salida y la llegada de las etapas de más de 200 km, ordenadas por km de mayor a menor y, a igualdad, por número de etapa.', ref:'SELECT netapa, km, salida, llegada FROM etapa WHERE km > 200 ORDER BY km DESC, netapa', hints:['Condición km > 200.']},
+{id:'w-c-sel4', lvl:1, db:'ciclismo', kind:'select', src:'LIKE', title:'Ciclistas llamados Miguel', prompt:"Muestra el nombre de los ciclistas cuyo nombre empieza por 'Miguel', ordenados alfabéticamente.", ref:"SELECT nombre FROM ciclista WHERE nombre LIKE 'Miguel%' ORDER BY nombre", hints:["LIKE 'Miguel%'."]},
+{id:'w-c-sel5', lvl:2, db:'ciclismo', kind:'select', src:'GROUP BY + HAVING', title:'Ciudades de salida repetidas', prompt:'Muestra las ciudades de salida que aparecen en más de una etapa, con cuántas etapas salen de cada una.', ref:'SELECT salida, COUNT(*) FROM etapa GROUP BY salida HAVING COUNT(*) > 1', hints:['GROUP BY salida con HAVING.']},
+{id:'w-c-sel6', lvl:2, db:'ciclismo', kind:'select', src:'MAX y MIN', title:'Altura máxima y mínima por categoría', prompt:'Para cada categoría de puerto muestra la categoría, la altura máxima y la mínima.', ref:'SELECT categoria, MAX(altura), MIN(altura) FROM puerto GROUP BY categoria', hints:['Dos agregados con GROUP BY categoria.']},
+{id:'w-i-20', lvl:2, db:'instituto', kind:'select', src:'GROUP BY', title:'Repetidores y no repetidores', prompt:'Cuenta cuántos alumnos son repetidores y cuántos no (es_repetidor y la cuenta).', ref:'SELECT es_repetidor, COUNT(*) FROM alumno GROUP BY es_repetidor', hints:['GROUP BY es_repetidor.']},
+{id:'w-i-21', lvl:2, db:'instituto', kind:'select', src:'Fechas', title:'Nacidos en verano', prompt:'Muestra nombre, apellido1 y fecha de nacimiento de los alumnos nacidos entre junio y septiembre (ambos meses incluidos), ordenados por fecha de nacimiento.', ref:'SELECT nombre, apellido1, fecha_nacimiento FROM alumno WHERE MONTH(fecha_nacimiento) BETWEEN 6 AND 9 ORDER BY fecha_nacimiento', hints:['MONTH(fecha) devuelve el mes (1-12).']},
+{id:'w-i-22', lvl:2, db:'instituto', kind:'write', src:'INSERT con AUTO_INCREMENT', title:'Inserta un alumno', prompt:"Da de alta a Eva Gil, nacida el 2000-05-04, no repetidora. El id es AUTO_INCREMENT y apellido2 y teléfono quedan sin valor. Indica las columnas.", ref:"INSERT INTO alumno (nombre, apellido1, fecha_nacimiento, es_repetidor) VALUES ('Eva', 'Gil', '2000-05-04', 'no')", hints:['No incluyas id ni las columnas opcionales.']},
+{id:'w-i-23', lvl:2, db:'instituto', kind:'write', src:'UPDATE con IS NULL', title:'Rellena los teléfonos que faltan', prompt:"Pon el teléfono '600000000' a todos los alumnos que no tienen teléfono.", ref:"UPDATE alumno SET telefono = '600000000' WHERE telefono IS NULL", hints:['IS NULL en el WHERE.']},
+{id:'w-i-24', lvl:3, db:'instituto', kind:'write', src:'DELETE con varias condiciones', title:'Borra repetidores antiguos', prompt:"Elimina a los alumnos repetidores nacidos antes de 1995.", ref:"DELETE FROM alumno WHERE es_repetidor = 'sí' AND fecha_nacimiento < '1995-01-01'", hints:['Dos condiciones con AND.']},
+{id:'w-i-25', lvl:3, db:'instituto', kind:'select', src:'Agregado con filtro', title:'Edad media de los repetidores', prompt:'Calcula la edad media (aproximada) de los alumnos repetidores.', ref:["SELECT AVG(TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE())) FROM alumno WHERE es_repetidor = 'sí'", "SELECT AVG(YEAR(CURDATE()) - YEAR(fecha_nacimiento)) FROM alumno WHERE es_repetidor = 'sí'"], hints:['AVG de la edad, filtrando antes con WHERE.']}
+);
+
 // BDA-QUEST · contenido SOLO para el modo papel: E/R de los boletines (con solución propuesta),
 // cardinalidades, normalización y los DML de los boletines que faltaban.
 // Convención de clase: el par (min,max) va pegado a la entidad que se cuenta.
@@ -2553,6 +2597,222 @@ BQ.DMLW.push(
 {id:'w-i-19', db:'instituto', kind:'select', src:'Boletín extra · ej. 16', title:'Día de la semana y mes', prompt:'Obtén el nombre completo, el día de la semana y el mes de la fecha de nacimiento de cada alumno.', ref:"SELECT CONCAT_WS(' ', nombre, apellido1, apellido2), DAYNAME(fecha_nacimiento), MONTHNAME(fecha_nacimiento) FROM alumno", hints:['DAYNAME() y MONTHNAME().']}
 );
 BQ._R = R; BQ._T = T;
+})();
+
+// BDA-QUEST · más ejercicios de papel: E/R fáciles (level 1), medios (2) y densos (3), y relámpagos.
+// Convención de clase: el par (min,max) va pegado a la entidad que se cuenta.
+// Las claves naturales que da el enunciado (DNI, ISBN, matrícula...) son la CP; solo hay id si el enunciado lo da o no hay ninguna.
+window.BQ = window.BQ || {};
+(function () {
+const R = BQ._R, T = BQ._T;
+
+// niveles de lo que ya existía
+const LV = {huerto: 2, ciclismo: 2, hospital: 2, tienda: 2, clinica: 3, festival: 3, consultora: 2, empresa: 2, huertoex: 2, concesionario: 3, comidas: 3, escolar: 3, redsocial: 3, piezas: 3, agencia: 3};
+[...BQ.CASES, ...BQ.PCASES].forEach(c => { if (LV[c.id]) c.level = LV[c.id]; });
+
+BQ.PCASES.push(
+// ======================= FÁCILES =======================
+{id:'biblioteca', name:'Biblioteca de barrio', level:1, from:'Fácil',
+ rules:['De cada libro se guarda su ISBN (no se repite), el título y el año de publicación.',
+  'De cada socio: DNI, nombre y email (puede no tenerlo).',
+  'Un socio puede llevarse prestados varios libros y un libro puede prestarse a distintos socios en fechas distintas. De cada préstamo se guarda la fecha de salida y la de devolución (no existe hasta que se devuelve el libro).'],
+ er:{entities:[{n:'Libro', attrs:[['isbn','I'],['titulo',''],['anio_publicacion','']]},{n:'Socio', attrs:[['dni','I'],['nombre',''],['email','o']]},{n:'Préstamo', attrs:[['id_prestamo','I'],['fecha_salida',''],['fecha_devolucion','o']]}]},
+ rels:[R('Socio','solicita','Préstamo','11','0N'), R('Libro','se presta en','Préstamo','11','0N')], asserts:[],
+ extra:['Préstamo es entidad porque la misma pareja socio–libro se repite en fechas distintas (con una N:M no cabría).'],
+ tables:[T('LIBRO = isbn*, titulo!, anio_publicacion!'), T('SOCIO = dni*, nombre!, email?'), T('PRESTAMO = id_prestamo*, fecha_salida!, fecha_devolucion?, dni_socio!->SOCIO, isbn!->LIBRO')]},
+
+{id:'veterinaria', name:'Clínica veterinaria', level:1, from:'Fácil · existencialidad',
+ rules:['De cada dueño: DNI, nombre y teléfono.', 'De cada mascota: número de chip (único), nombre, especie y fecha de nacimiento (puede desconocerse).',
+  'Cada mascota pertenece a un único dueño. Solo se registra a un dueño cuando trae al menos una mascota.'],
+ er:{entities:[{n:'Dueño', attrs:[['dni','I'],['nombre',''],['telefono','']]},{n:'Mascota', attrs:[['chip','I'],['nombre',''],['especie',''],['fecha_nacimiento','o']]}]},
+ rels:[R('Dueño','tiene','Mascota','11','1N')],
+ asserts:[{t:'DUENO[dni] ⊆ MASCOTA[dni_dueno]', why:'"Solo se registra a un dueño cuando trae al menos una mascota": mínimo 1 → todo dueño aparece en MASCOTA.'}],
+ extra:['La FK va en MASCOTA (lado N) y es NOT NULL, pero eso no garantiza que todo dueño tenga mascota: hace falta la aserción.'],
+ tables:[T('DUENO = dni*, nombre!, telefono!'), T('MASCOTA = chip*, nombre!, especie!, fecha_nacimiento?, dni_dueno!->DUENO')]},
+
+{id:'gimnasio', name:'Gimnasio', level:1, from:'Fácil · N:M + 1:N',
+ rules:['De cada socio: número de socio, nombre y fecha de alta.', 'De cada clase: código, nombre, día de la semana y hora.',
+  'Un socio puede apuntarse a varias clases (o a ninguna) y una clase puede tener varios socios o ninguno todavía.',
+  'Cada clase la imparte un único monitor (DNI y nombre). Todo monitor imparte al menos una clase.'],
+ er:{entities:[{n:'Socio', attrs:[['num_socio','I'],['nombre',''],['fecha_alta','']]},{n:'Clase', attrs:[['cod_clase','I'],['nombre',''],['dia_semana',''],['hora','']]},{n:'Monitor', attrs:[['dni','I'],['nombre','']]}]},
+ rels:[R('Socio','se apunta a','Clase','0N','0N'), R('Monitor','imparte','Clase','11','1N')],
+ asserts:[{t:'MONITOR[dni] ⊆ CLASE[dni_monitor]', why:'"Todo monitor imparte al menos una clase": mínimo 1 en el lado "1".'}],
+ extra:[],
+ tables:[T('SOCIO = num_socio*, nombre!, fecha_alta!'), T('MONITOR = dni*, nombre!'), T('CLASE = cod_clase*, nombre!, dia_semana!, hora!, dni_monitor!->MONITOR'), T('SOCIO_CLASE = num_socio*->SOCIO, cod_clase*->CLASE')]},
+
+{id:'hotel', name:'Hotel', level:1, from:'Fácil · entidad intermedia',
+ rules:['De cada cliente: DNI, nombre y teléfono.', 'De cada habitación: número, tipo (individual, doble, suite) y precio por noche.',
+  'Un cliente puede hacer varias reservas. Cada reserva es de un único cliente y de una única habitación, con fecha de entrada y de salida. Una habitación puede reservarse muchas veces en fechas distintas.'],
+ er:{entities:[{n:'Cliente', attrs:[['dni','I'],['nombre',''],['telefono','']]},{n:'Habitación', attrs:[['num_habitacion','I'],['tipo',''],['precio_noche','']]},{n:'Reserva', attrs:[['id_reserva','I'],['fecha_entrada',''],['fecha_salida','']]}]},
+ rels:[R('Cliente','hace','Reserva','11','0N'), R('Habitación','se reserva en','Reserva','11','0N')], asserts:[],
+ extra:['Reserva es entidad: una habitación se reserva muchas veces con fechas distintas.'],
+ tables:[T('CLIENTE = dni*, nombre!, telefono!'), T('HABITACION = num_habitacion*, tipo!, precio_noche!'), T('RESERVA = id_reserva*, fecha_entrada!, fecha_salida!, dni_cliente!->CLIENTE, num_habitacion!->HABITACION')]},
+
+{id:'idiomas', name:'Academia de idiomas', level:1, from:'Fácil · N:M con atributos',
+ rules:['De cada alumno: DNI y nombre. De cada profesor: DNI y nombre.', 'De cada curso: código, idioma y nivel (A1, A2, B1...).',
+  'Un alumno puede matricularse en varios cursos y un curso tiene varios alumnos. De cada matrícula se guarda la fecha y la nota final (que no existe hasta que termina el curso).',
+  'Cada curso lo imparte un único profesor; un profesor puede impartir varios cursos.'],
+ er:{entities:[{n:'Alumno', attrs:[['dni','I'],['nombre','']]},{n:'Profesor', attrs:[['dni','I'],['nombre','']]},{n:'Curso', attrs:[['codigo','I'],['idioma',''],['nivel','']]}]},
+ rels:[R('Alumno','se matricula en','Curso','0N','0N',{attr:'fecha_matricula, nota'}), R('Profesor','imparte','Curso','11','0N')], asserts:[],
+ extra:['fecha_matricula y nota son atributos de la relación N:M (la nota es opcional).'],
+ tables:[T('ALUMNO = dni*, nombre!'), T('PROFESOR = dni*, nombre!'), T('CURSO = codigo*, idioma!, nivel!, dni_profesor!->PROFESOR'), T('MATRICULA = dni_alumno*->ALUMNO, codigo_curso*->CURSO, fecha_matricula!, nota?')]},
+
+{id:'autoescuela', name:'Autoescuela', level:1, from:'Fácil · tres 1:N sobre la misma entidad',
+ rules:['De cada alumno: DNI, nombre y teléfono. De cada profesor: DNI y nombre. De cada vehículo: matrícula (única), marca y modelo.',
+  'Se registran las clases prácticas: fecha y hora. Cada clase práctica la recibe un único alumno, la da un único profesor y se hace con un único vehículo.', 'Un alumno, un profesor o un vehículo pueden no haber participado en ninguna clase todavía.'],
+ er:{entities:[{n:'Alumno', attrs:[['dni','I'],['nombre',''],['telefono','']]},{n:'Profesor', attrs:[['dni','I'],['nombre','']]},{n:'Vehículo', attrs:[['matricula','I'],['marca',''],['modelo','']]},{n:'Clase práctica', attrs:[['id_clase','I'],['fecha',''],['hora','']]}]},
+ rels:[R('Alumno','recibe','Clase práctica','11','0N'), R('Profesor','da','Clase práctica','11','0N'), R('Vehículo','se usa en','Clase práctica','11','0N')], asserts:[],
+ extra:[],
+ tables:[T('ALUMNO = dni*, nombre!, telefono!'), T('PROFESOR = dni*, nombre!'), T('VEHICULO = matricula*, marca!, modelo!'), T('CLASE_PRACTICA = id_clase*, fecha!, hora!, dni_alumno!->ALUMNO, dni_profesor!->PROFESOR, matricula!->VEHICULO')]},
+
+// ======================= MEDIOS =======================
+{id:'universidad', name:'Universidad (con prerrequisitos)', level:2, from:'Media · reflexiva + existencialidad',
+ rules:['De cada alumno: DNI, nombre, apellidos y email (no se repite).',
+  'De cada asignatura: código, nombre y créditos. Una asignatura puede exigir haber aprobado otras antes (varias) y, a su vez, ser requisito de otras.',
+  'De cada departamento: código y nombre. Todo departamento tiene al menos un profesor y cada profesor pertenece a un único departamento.',
+  'De cada profesor: DNI y nombre. Cada asignatura la imparte un único profesor; un profesor puede impartir varias asignaturas.',
+  'Un alumno se matricula de varias asignaturas cada curso académico. De cada matrícula se guarda el curso académico (por ejemplo 2024/25) y la nota (hasta que se evalúa no existe). Un alumno puede repetir la asignatura en cursos distintos.'],
+ er:{entities:[{n:'Alumno', attrs:[['dni','I'],['nombre',''],['apellidos',''],['email','a']]},{n:'Asignatura', attrs:[['cod_asignatura','I'],['nombre',''],['creditos','']]},{n:'Departamento', attrs:[['cod_depto','I'],['nombre','']]},{n:'Profesor', attrs:[['dni_profesor','I'],['nombre','']]},{n:'Matrícula', attrs:[['id_matricula','I'],['curso_academico',''],['nota','o']]}]},
+ rels:[R('Departamento','agrupa','Profesor','11','1N'), R('Profesor','imparte','Asignatura','11','0N'), R('Alumno','realiza','Matrícula','11','0N'), R('Asignatura','se cursa en','Matrícula','11','0N'),
+  R('Asignatura','es requisito de','Asignatura','0N','0N',{roles:{a:'requisito',b:'dependiente'}})],
+ asserts:[{t:'DEPARTAMENTO[cod_depto] ⊆ PROFESOR[cod_depto]', why:'"Todo departamento tiene al menos un profesor": mínimo 1 en el lado "1".'}],
+ extra:['Matrícula es entidad porque el alumno repite la asignatura en cursos distintos.','Reflexiva N:M con roles requisito / dependiente → tabla REQUISITO con dos FKs a ASIGNATURA.'],
+ tables:[T('DEPARTAMENTO = cod_depto*, nombre!'), T('PROFESOR = dni_profesor*, nombre!, cod_depto!->DEPARTAMENTO'), T('ASIGNATURA = cod_asignatura*, nombre!, creditos!, dni_profesor!->PROFESOR'),
+  T('ALUMNO = dni*, nombre!, apellidos!, email+!'), T('MATRICULA = id_matricula*, curso_academico!, nota?, dni_alumno!->ALUMNO, cod_asignatura!->ASIGNATURA'), T('REQUISITO = cod_asignatura*->ASIGNATURA, cod_requisito*->ASIGNATURA')]},
+
+{id:'delivery', name:'Comida a domicilio', level:2, from:'Media · FK opcional + N:M con atributo',
+ rules:['De cada cliente: DNI, nombre, teléfono y dirección de entrega (calle, número y ciudad).',
+  'De cada restaurante: CIF, nombre y dirección. Cada restaurante ofrece al menos un plato; de cada plato: código, nombre y precio. Un plato pertenece a un único restaurante.',
+  'Un cliente hace pedidos a un restaurante: fecha y hora y estado (recibido, en preparación, en reparto, entregado). Cada pedido es de un único cliente y de un único restaurante.',
+  'Un pedido incluye uno o varios platos con la cantidad de cada uno.',
+  'Cada pedido lo entrega un repartidor (DNI, nombre y matrícula de la moto), pero hasta que se asigna no tiene repartidor. Un repartidor puede entregar muchos pedidos.'],
+ er:{entities:[{n:'Cliente', attrs:[['dni','I'],['nombre',''],['telefono',''],['calle','c'],['numero','c'],['ciudad','c']]},{n:'Restaurante', attrs:[['cif','I'],['nombre',''],['direccion','']]},{n:'Plato', attrs:[['cod_plato','I'],['nombre',''],['precio','']]},{n:'Pedido', attrs:[['num_pedido','I'],['fecha_hora',''],['estado','']]},{n:'Repartidor', attrs:[['dni_repartidor','I'],['nombre',''],['matricula_moto','']]}]},
+ rels:[R('Cliente','hace','Pedido','11','0N'), R('Restaurante','recibe','Pedido','11','0N'), R('Restaurante','ofrece','Plato','11','1N'), R('Repartidor','entrega','Pedido','01','0N'), R('Pedido','incluye','Plato','0N','1N',{attr:'cantidad'})],
+ asserts:[{t:'RESTAURANTE[cif] ⊆ PLATO[cif_restaurante]', why:'"Cada restaurante ofrece al menos un plato": mínimo 1 en el lado "1".'}],
+ extra:['El repartidor es (0,1) por pedido: la FK dni_repartidor en PEDIDO admite NULL hasta que se asigna.'],
+ tables:[T('CLIENTE = dni*, nombre!, telefono!, calle!, numero!, ciudad!'), T('RESTAURANTE = cif*, nombre!, direccion!'), T('PLATO = cod_plato*, nombre!, precio!, cif_restaurante!->RESTAURANTE'), T('REPARTIDOR = dni_repartidor*, nombre!, matricula_moto!'),
+  T('PEDIDO = num_pedido*, fecha_hora!, estado!, dni_cliente!->CLIENTE, cif_restaurante!->RESTAURANTE, dni_repartidor?->REPARTIDOR'), T('LINEA_PEDIDO = num_pedido*->PEDIDO, cod_plato*->PLATO, cantidad!')]},
+
+{id:'liga', name:'Liga de fútbol', level:2, from:'Media · dos relaciones con la misma entidad',
+ rules:['De cada equipo: código, nombre y ciudad. Cada equipo juega en un único estadio (código, nombre y aforo); un estadio puede ser de varios equipos.',
+  'De cada jugador: DNI, nombre, dorsal y posición. Cada jugador pertenece a un único equipo y todo equipo tiene al menos un jugador.',
+  'De cada partido: fecha, jornada y goles del equipo local y del visitante. Cada partido lo juegan exactamente dos equipos (uno local y otro visitante) y un equipo juega muchos partidos.',
+  'Se anota qué jugadores marcan en cada partido, con el minuto de cada gol (un jugador puede marcar varios goles en el mismo partido).'],
+ er:{entities:[{n:'Equipo', attrs:[['cod_equipo','I'],['nombre',''],['ciudad','']]},{n:'Estadio', attrs:[['cod_estadio','I'],['nombre',''],['aforo','']]},{n:'Jugador', attrs:[['dni','I'],['nombre',''],['dorsal',''],['posicion','']]},{n:'Partido', attrs:[['id_partido','I'],['fecha',''],['jornada',''],['goles_local',''],['goles_visitante','']]},{n:'Gol', attrs:[['id_gol','I'],['minuto','']]}]},
+ rels:[R('Estadio','alberga a','Equipo','11','0N'), R('Equipo','ficha a','Jugador','11','1N'), R('Equipo','juega como local','Partido','11','0N'), R('Equipo','juega como visitante','Partido','11','0N'), R('Partido','tiene','Gol','11','0N'), R('Jugador','marca','Gol','11','0N')],
+ asserts:[{t:'EQUIPO[cod_equipo] ⊆ JUGADOR[cod_equipo]', why:'"Todo equipo tiene al menos un jugador": mínimo 1 en el lado "1".'}],
+ extra:['Dos relaciones distintas entre Equipo y Partido (local y visitante): dos FKs a EQUIPO en PARTIDO.','Gol es entidad: un jugador puede marcar varios goles en el mismo partido.'],
+ tables:[T('ESTADIO = cod_estadio*, nombre!, aforo!'), T('EQUIPO = cod_equipo*, nombre!, ciudad!, cod_estadio!->ESTADIO'), T('JUGADOR = dni*, nombre!, dorsal!, posicion!, cod_equipo!->EQUIPO'),
+  T('PARTIDO = id_partido*, fecha!, jornada!, goles_local!, goles_visitante!, equipo_local!->EQUIPO, equipo_visitante!->EQUIPO'), T('GOL = id_gol*, minuto!, id_partido!->PARTIDO, dni_jugador!->JUGADOR')]},
+
+{id:'congreso', name:'Congreso', level:2, from:'Media · N:M con varios atributos',
+ rules:['Un congreso tiene código, nombre, ciudad y fechas de inicio y fin. Se organiza en varias charlas y todo congreso tiene al menos una.',
+  'De cada charla: título, hora y duración. Cada charla pertenece a un único congreso y se da en una única sala (código y aforo); una sala acoge varias charlas.',
+  'Los ponentes (DNI, nombre y email) dan charlas: una charla la dan uno o varios ponentes y un ponente puede dar varias charlas.',
+  'Los asistentes (DNI, nombre y empresa, que puede no constar) se inscriben en congresos: se guarda la fecha de inscripción y el tipo de entrada (general o VIP). Un asistente puede ir a varios congresos.'],
+ er:{entities:[{n:'Congreso', attrs:[['cod_congreso','I'],['nombre',''],['ciudad',''],['fecha_inicio',''],['fecha_fin','']]},{n:'Charla', attrs:[['id_charla','I'],['titulo',''],['hora',''],['duracion','']]},{n:'Sala', attrs:[['cod_sala','I'],['aforo','']]},{n:'Ponente', attrs:[['dni_ponente','I'],['nombre',''],['email','']]},{n:'Asistente', attrs:[['dni_asistente','I'],['nombre',''],['empresa','o']]}]},
+ rels:[R('Congreso','organiza','Charla','11','1N'), R('Sala','acoge','Charla','11','0N'), R('Ponente','da','Charla','1N','0N'), R('Asistente','se inscribe en','Congreso','0N','0N',{attr:'fecha_inscripcion, tipo_entrada'})],
+ asserts:[{t:'CONGRESO[cod_congreso] ⊆ CHARLA[cod_congreso]', why:'"Todo congreso tiene al menos una charla": mínimo 1 en el lado "1".'}],
+ extra:['Ponente–Charla es N:M (1,N) por charla: toda charla tiene al menos un ponente → otra aserción posible: CHARLA[id_charla] ⊆ CHARLA_PONENTE[id_charla].'],
+ tables:[T('CONGRESO = cod_congreso*, nombre!, ciudad!, fecha_inicio!, fecha_fin!'), T('SALA = cod_sala*, aforo!'), T('CHARLA = id_charla*, titulo!, hora!, duracion!, cod_congreso!->CONGRESO, cod_sala!->SALA'), T('PONENTE = dni_ponente*, nombre!, email!'),
+  T('ASISTENTE = dni_asistente*, nombre!, empresa?'), T('CHARLA_PONENTE = id_charla*->CHARLA, dni_ponente*->PONENTE'), T('INSCRIPCION = dni_asistente*->ASISTENTE, cod_congreso*->CONGRESO, fecha_inscripcion!, tipo_entrada!')]},
+
+// ======================= DENSOS =======================
+{id:'streaming', name:'Plataforma de streaming', level:3, from:'Densa · ISA, entidades débiles y multivalorado',
+ rules:['De cada usuario: identificador, email (no se repite), nombre, fecha de alta y uno o varios teléfonos.',
+  'Cada usuario tiene al menos un perfil. Un perfil se identifica por su nombre dentro de la cuenta de su usuario (dos usuarios pueden tener perfiles con el mismo nombre) y guarda el idioma y si es infantil.',
+  'El catálogo se compone de contenidos: identificador, título y año. Cada contenido es una película (con duración) o una serie, y no puede ser las dos cosas; todo contenido es una de las dos.',
+  'Una serie se divide en temporadas numeradas (1, 2, 3...) y cada temporada en episodios también numerados dentro de su temporada, con título y duración. Una temporada no existe sin su serie ni un episodio sin su temporada.',
+  'Cada contenido pertenece a uno o varios géneros (nombre único) y un género puede no tener contenidos todavía.',
+  'Los perfiles valoran contenidos con una puntuación del 1 al 5 y la fecha; un perfil valora un contenido como mucho una vez.',
+  'Se guarda cada reproducción: qué perfil reproduce qué contenido, la fecha y hora de inicio y hasta qué minuto llegó. Un perfil puede ver el mismo contenido varias veces.'],
+ er:{entities:[{n:'Usuario', attrs:[['id_usuario','I'],['email','a'],['nombre',''],['fecha_alta',''],['telefono','m']]},{n:'Perfil', attrs:[['nombre','p'],['idioma',''],['infantil','']]},{n:'Contenido', attrs:[['id_contenido','I'],['titulo',''],['anio','']]},{n:'Película', attrs:[['duracion','']]},{n:'Serie', attrs:[]},{n:'Temporada', attrs:[['num_temporada','p']]},{n:'Episodio', attrs:[['num_episodio','p'],['titulo',''],['duracion','']]},{n:'Género', attrs:[['id_genero','I'],['nombre','a']]},{n:'Reproducción', attrs:[['id_reproduccion','I'],['fecha_hora',''],['minuto','']]}]},
+ rels:[R('Usuario','tiene','Perfil','11','1N'), R('Serie','se divide en','Temporada','11','1N'), R('Temporada','se divide en','Episodio','11','1N'), R('Contenido','pertenece a','Género','0N','1N'), R('Perfil','valora','Contenido','0N','0N',{attr:'puntuacion, fecha'}), R('Perfil','inicia','Reproducción','11','0N'), R('Contenido','se reproduce en','Reproducción','11','0N')],
+ asserts:[{t:'CONTENIDO[id_contenido] ⊆ PELICULA[id_contenido] ∪ SERIE[id_contenido]', why:'ISA total: todo contenido es película o serie.'},{t:'PELICULA[id_contenido] ∩ SERIE[id_contenido] = ∅', why:'ISA disyunta: nadie es las dos cosas.'},{t:'USUARIO[id_usuario] ⊆ PERFIL[id_usuario]', why:'"Cada usuario tiene al menos un perfil": mínimo 1.'}],
+ extra:['ISA total disyunta: Contenido → Película | Serie (una tabla por subtipo con FK a CONTENIDO que es también su CP).','Entidades débiles: Perfil (de Usuario, clave parcial nombre), Temporada (de Serie, clave parcial número) y Episodio (de Temporada, clave parcial número).','Teléfonos: multivalorado → tabla aparte. Valoración: N:M Perfil–Contenido con puntuación y fecha.'],
+ tables:[T('USUARIO = id_usuario*, email+!, nombre!, fecha_alta!'), T('TELEFONO_USUARIO = id_usuario*->USUARIO, telefono*'), T('PERFIL = id_usuario*->USUARIO, nombre*, idioma!, infantil!'),
+  T('CONTENIDO = id_contenido*, titulo!, anio!'), T('PELICULA = id_contenido*->CONTENIDO, duracion!'), T('SERIE = id_contenido*->CONTENIDO'), T('TEMPORADA = id_contenido*->SERIE, num_temporada*'),
+  T('EPISODIO = id_contenido*->TEMPORADA#1, num_temporada*->TEMPORADA#1, num_episodio*, titulo!, duracion!'), T('GENERO = id_genero*, nombre+!'), T('CONTENIDO_GENERO = id_contenido*->CONTENIDO, id_genero*->GENERO'),
+  T('VALORACION = id_usuario*->PERFIL#1, nombre_perfil*->PERFIL#1, id_contenido*->CONTENIDO, puntuacion!, fecha!'), T('REPRODUCCION = id_reproduccion*, fecha_hora!, minuto!, id_usuario!->PERFIL#1, nombre_perfil!->PERFIL#1, id_contenido!->CONTENIDO')]},
+
+{id:'hospital2', name:'Hospital completo', level:3, from:'Densa · ISA, reflexiva, ternaria y existencialidad',
+ rules:['De cada departamento: código y nombre. Un departamento puede depender de otro departamento (jerarquía) y tener varios dependientes. Los departamentos raíz no dependen de ninguno.',
+  'Personal sanitario: DNI, nombre y salario. Todo el personal pertenece a un único departamento y todo departamento tiene al menos una persona. El personal es médico (con especialidad y número de colegiado, que no se repite) o enfermero (con turno); nadie es las dos cosas y todo el personal es una de las dos.',
+  'De cada paciente: NSS, nombre y fecha de nacimiento.',
+  'Habitaciones: número y planta; cada una con varias camas numeradas (cama 1, cama 2...) y se anota si está ocupada. Una cama no existe sin su habitación.',
+  'Un ingreso se identifica por un número y guarda la fecha de ingreso y la de alta (que no existe hasta que sale). Cada ingreso es de un paciente, ocupa una cama concreta y lo supervisa un médico responsable. Un paciente puede tener varios ingresos y una cama, a lo largo del tiempo, también.',
+  'Medicamentos: código y nombre. Durante un ingreso, un médico prescribe medicamentos con la dosis y la fecha de prescripción; un mismo médico puede prescribir el mismo medicamento en un ingreso en fechas distintas.'],
+ er:{entities:[{n:'Departamento', attrs:[['cod_depto','I'],['nombre','']]},{n:'Personal', attrs:[['dni','I'],['nombre',''],['salario','']]},{n:'Médico', attrs:[['num_colegiado','a'],['especialidad','']]},{n:'Enfermero', attrs:[['turno','']]},{n:'Paciente', attrs:[['nss','I'],['nombre',''],['fecha_nacimiento','']]},{n:'Habitación', attrs:[['num_habitacion','I'],['planta','']]},{n:'Cama', attrs:[['num_cama','p'],['ocupada','']]},{n:'Ingreso', attrs:[['num_ingreso','I'],['fecha_ingreso',''],['fecha_alta','o']]},{n:'Medicamento', attrs:[['cod_medicamento','I'],['nombre','']]}]},
+ rels:[R('Departamento','depende de','Departamento','01','0N',{roles:{a:'superior',b:'dependiente'}}), R('Departamento','emplea a','Personal','11','1N'), R('Habitación','tiene','Cama','11','1N'), R('Paciente','tiene','Ingreso','11','0N'), R('Cama','aloja','Ingreso','11','0N'), R('Médico','supervisa','Ingreso','11','0N'),
+  {verb:'prescribe', ternary:[{e:'Médico', m:['0','N']},{e:'Ingreso', m:['0','N']},{e:'Medicamento', m:['0','N']}], attr:'dosis, fecha_prescripcion', tipo:'N:M:N', why:'Ternaria Médico–Ingreso–Medicamento con dosis y fecha. La fecha forma parte de la CP porque el mismo médico puede prescribir el mismo medicamento varias veces.'}],
+ asserts:[{t:'DEPARTAMENTO[cod_depto] ⊆ PERSONAL[cod_depto]', why:'"Todo departamento tiene al menos una persona".'},{t:'PERSONAL[dni] ⊆ MEDICO[dni] ∪ ENFERMERO[dni]', why:'ISA total: todo el personal es médico o enfermero.'},{t:'MEDICO[dni] ∩ ENFERMERO[dni] = ∅', why:'ISA disyunta: nadie es las dos cosas.'}],
+ extra:['ISA total disyunta Personal → Médico | Enfermero. Reflexiva Departamento–Departamento con roles superior / dependiente (0,1)/(0,N).','Cama es entidad débil de Habitación (clave parcial num_cama). Ingreso apunta a la cama con FK compuesta (num_habitacion, num_cama).'],
+ tables:[T('DEPARTAMENTO = cod_depto*, nombre!, cod_depto_superior?->DEPARTAMENTO'), T('PERSONAL = dni*, nombre!, salario!, cod_depto!->DEPARTAMENTO'), T('MEDICO = dni*->PERSONAL, num_colegiado+!, especialidad!'), T('ENFERMERO = dni*->PERSONAL, turno!'),
+  T('PACIENTE = nss*, nombre!, fecha_nacimiento!'), T('HABITACION = num_habitacion*, planta!'), T('CAMA = num_habitacion*->HABITACION, num_cama*, ocupada!'),
+  T('INGRESO = num_ingreso*, fecha_ingreso!, fecha_alta?, nss!->PACIENTE, num_habitacion!->CAMA#1, num_cama!->CAMA#1, dni_medico!->MEDICO'), T('MEDICAMENTO = cod_medicamento*, nombre!'),
+  T('PRESCRIPCION = dni_medico*->MEDICO, num_ingreso*->INGRESO, cod_medicamento*->MEDICAMENTO, fecha_prescripcion*, dosis!')]},
+
+{id:'trenes', name:'Red ferroviaria', level:3, from:'Densa · reflexiva N:M, débil y dos relaciones',
+ rules:['De cada estación: código, nombre y ciudad. Una estación puede tener correspondencia con otras estaciones y se guarda los minutos de transbordo.',
+  'De cada línea: código, nombre y color. Una línea pasa por varias estaciones en un orden concreto (1.ª, 2.ª...) y toda estación está en alguna línea; toda línea pasa por alguna estación.',
+  'De cada tren: matrícula, modelo y número de plazas. Cada tren está asignado a una única línea y toda línea tiene al menos un tren.',
+  'Los viajes son salidas programadas de un tren: se identifican por un número y guardan la fecha y la hora de salida. Un tren hace muchos viajes y cada viaje es de un único tren.',
+  'Los pasajeros (DNI, nombre y email) compran billetes. Un billete es para un viaje concreto, indica el número de asiento (que se repite en otros viajes) y el precio; un asiento de un viaje solo se vende una vez. Un billete lo compra un único pasajero.',
+  'De cada billete se registra también la estación de subida y la de bajada.'],
+ er:{entities:[{n:'Estación', attrs:[['cod_estacion','I'],['nombre',''],['ciudad','']]},{n:'Línea', attrs:[['cod_linea','I'],['nombre',''],['color','']]},{n:'Tren', attrs:[['matricula','I'],['modelo',''],['num_plazas','']]},{n:'Viaje', attrs:[['num_viaje','I'],['fecha_hora','']]},{n:'Pasajero', attrs:[['dni','I'],['nombre',''],['email','']]},{n:'Billete', attrs:[['num_asiento','p'],['precio','']]}]},
+ rels:[R('Estación','tiene correspondencia con','Estación','0N','0N',{roles:{a:'origen',b:'destino'},attr:'minutos_transbordo'}), R('Línea','pasa por','Estación','1N','1N',{attr:'orden'}), R('Línea','tiene','Tren','11','1N'), R('Tren','hace','Viaje','11','0N'), R('Viaje','incluye','Billete','11','0N'), R('Pasajero','compra','Billete','11','0N'), R('Estación','es subida de','Billete','11','0N'), R('Estación','es bajada de','Billete','11','0N')],
+ asserts:[{t:'LINEA[cod_linea] ⊆ TREN[cod_linea]', why:'"Toda línea tiene al menos un tren".'},{t:'LINEA[cod_linea] ⊆ LINEA_ESTACION[cod_linea]', why:'"Toda línea pasa por alguna estación".'},{t:'ESTACION[cod_estacion] ⊆ LINEA_ESTACION[cod_estacion]', why:'"Toda estación está en alguna línea".'}],
+ extra:['Billete es entidad débil de Viaje: identificador (viaje + asiento); clave parcial num_asiento.','Dos relaciones distintas Estación–Billete (subida y bajada): dos FKs a ESTACION en BILLETE.','La reflexiva N:M de correspondencias lleva el atributo minutos_transbordo (tabla CORRESPONDENCIA con dos FKs a ESTACION).'],
+ tables:[T('ESTACION = cod_estacion*, nombre!, ciudad!'), T('CORRESPONDENCIA = cod_estacion_origen*->ESTACION, cod_estacion_destino*->ESTACION, minutos_transbordo!'), T('LINEA = cod_linea*, nombre!, color!'), T('LINEA_ESTACION = cod_linea*->LINEA, cod_estacion*->ESTACION, orden!'),
+  T('TREN = matricula*, modelo!, num_plazas!, cod_linea!->LINEA'), T('VIAJE = num_viaje*, fecha_hora!, matricula!->TREN'), T('PASAJERO = dni*, nombre!, email!'), T('BILLETE = num_viaje*->VIAJE, num_asiento*, precio!, dni_pasajero!->PASAJERO, estacion_subida!->ESTACION, estacion_bajada!->ESTACION')]}
+);
+
+BQ.PCASES.push(
+{id:'academia', name:'Academia de formación', level:1, from:'Enunciado de práctica · fácil',
+ rules:['Una academia de formación quiere desarrollar una base de datos para gestionar su actividad.',
+  'De cada persona matriculada se conoce su DNI, nombre, apellidos, teléfono y correo electrónico. La academia ofrece diferentes formaciones, de las que se almacena un código identificativo, nombre, duración y precio.',
+  'Cada persona puede apuntarse a varias formaciones y una formación puede contar con diferentes personas matriculadas. Además, se necesita almacenar la fecha en la que cada persona se inscribe.',
+  'Las formaciones son impartidas por profesionales externos o internos. De cada profesional se conoce su número de identificación, nombre y especialidad. Un profesional puede impartir varias formaciones, pero cada formación tiene asignado un único profesional.'],
+ er:{entities:[{n:'Persona', attrs:[['dni','I'],['nombre',''],['apellidos',''],['telefono',''],['correo','']]},{n:'Formación', attrs:[['cod_formacion','I'],['nombre',''],['duracion',''],['precio','']]},{n:'Profesional', attrs:[['num_identificacion','I'],['nombre',''],['especialidad','']]}]},
+ rels:[R('Persona','se inscribe en','Formación','0N','0N',{attr:'fecha_inscripcion'}), R('Profesional','imparte','Formación','11','0N')], asserts:[],
+ extra:['Persona–Formación es N:M y la fecha de inscripción es un atributo de la relación (va en la tabla intermedia).','Que el profesional sea interno o externo no añade atributos propios: no hace falta una ISA. Si se quisiera guardar, sería un atributo tipo de Profesional.','La FK de la 1:N va en FORMACION (lado N): num_profesional → PROFESIONAL, NOT NULL porque cada formación tiene un único profesional.'],
+ tables:[T('PERSONA = dni*, nombre!, apellidos!, telefono!, correo!'), T('PROFESIONAL = num_identificacion*, nombre!, especialidad!'), T('FORMACION = cod_formacion*, nombre!, duracion!, precio!, num_profesional!->PROFESIONAL'), T('INSCRIPCION = dni*->PERSONA, cod_formacion*->FORMACION, fecha_inscripcion!')]}
+);
+
+// ---------- RELÁMPAGO: pares (min,max) a partir de una frase (2 min) ----------
+BQ.CARD1 = [
+ ['Un cliente realiza pedidos; cada pedido es de un único cliente y un cliente puede no haber hecho ninguno.', 'Cliente (1,1) — realiza — (0,N) Pedido · 1:N.'],
+ ['Un empleado trabaja en un único departamento; todo departamento tiene al menos un empleado.', 'Departamento (1,1) — tiene — (1,N) Empleado · 1:N. Mínimo 1 en el lado "1" → aserción DEPARTAMENTO ⊆ EMPLEADO.'],
+ ['Un profesor imparte varias asignaturas (puede no impartir ninguna) y cada asignatura la imparte un único profesor.', 'Profesor (1,1) — imparte — (0,N) Asignatura · 1:N.'],
+ ['Un coche tiene una única matrícula y cada matrícula es de un único coche.', 'Es un atributo (identificador) de Coche. Como relación: Coche (1,1) — (1,1) Matrícula · 1:1.'],
+ ['Un médico atiende pacientes y un paciente es atendido por varios médicos. De cada visita se guarda la fecha y el mismo paciente y médico pueden verse varias veces.', 'Visita pasa a ser <b>entidad</b>: Médico (1,1) — (0,N) Visita y Paciente (1,1) — (0,N) Visita.'],
+ ['Un empleado puede tener un jefe (otro empleado) y un jefe puede tener varios empleados a su cargo.', 'Reflexiva: Empleado [rol jefe] (0,1) — supervisa — (0,N) [rol subordinado] Empleado.'],
+ ['Un libro lo escriben uno o varios autores y un autor ha escrito al menos un libro.', 'Autor (1,N) — escribe — (1,N) Libro · N:M.'],
+ ['Cada reserva de hotel es de una sola habitación; una habitación puede no haberse reservado nunca.', 'Habitación (1,1) — se reserva en — (0,N) Reserva · 1:N.'],
+ ['Un proveedor suministra un producto a un almacén en una cantidad determinada.', 'Ternaria Proveedor (0,N) — Producto (0,N) — Almacén (0,N) con atributo cantidad.'],
+ ['Un alumno tiene un único tutor (profesor); un profesor puede ser tutor de varios alumnos o de ninguno.', 'Profesor (1,1) — tutoriza — (0,N) Alumno · 1:N.'],
+ ['Un país tiene varias ciudades y una ciudad pertenece a un único país; la ciudad no existe sin su país.', 'País (1,1) — tiene — (1,N) Ciudad. Ciudad es entidad <b>débil</b> (doble rectángulo, rombo doble, clave parcial).'],
+ ['Un usuario puede bloquear a otros usuarios.', 'Reflexiva N:M: Usuario [bloqueador] (0,N) — bloquea — (0,N) [bloqueado] Usuario.'],
+ ['Un congreso tiene muchos asistentes y un asistente va a muchos congresos; se guarda la fecha de inscripción.', 'Asistente (0,N) — se inscribe en — (0,N) Congreso · N:M con atributo fecha_inscripcion.'],
+ ['Cada película tiene un único director y un director ha dirigido al menos una película.', 'Director (1,1) — dirige — (1,N) Película · 1:N. Aserción DIRECTOR ⊆ PELICULA.'],
+ ['Una persona es alumno o profesor (nunca las dos cosas) y todos son una de las dos.', 'ISA <b>total disyunta</b>: Persona → Alumno | Profesor. Aserciones: PERSONA ⊆ ALUMNO ∪ PROFESOR y ALUMNO ∩ PROFESOR = ∅.']
+];
+
+// ---------- RELÁMPAGO: paso a tablas de un patrón (3 min) ----------
+BQ.TAB0 = [
+ {q:'Cliente (1,1) — realiza — (0,N) Pedido', a:'PEDIDO = id + cliente_id + fecha\nCP(id)\nC.Aj(cliente_id) → CLIENTE(id)\nVNN(cliente_id)', h:['1:N → la FK va en el lado N (Pedido).','Mínimo 1 junto a Cliente → la FK es NOT NULL.']},
+ {q:'Cliente (0,1) — realiza — (0,N) Pedido (un pedido puede no tener cliente)', a:'PEDIDO = id + cliente_id + fecha\nCP(id)\nC.Aj(cliente_id) → CLIENTE(id)      (sin VNN: admite NULL)', h:['El mínimo del lado "1" es 0 → la FK admite NULL.']},
+ {q:'Alumno (0,N) — se matricula — (0,N) Curso, con atributo nota', a:'MATRICULA = dni_alumno + codigo_curso + nota\nCP(dni_alumno, codigo_curso)\nC.Aj(dni_alumno) → ALUMNO(dni)\nC.Aj(codigo_curso) → CURSO(codigo)', h:['N:M → tabla intermedia.','El atributo de la relación va en ella.']},
+ {q:'Persona (1,1) — tiene — (1,1) Pasaporte', a:'PASAPORTE = id + numero + persona_id\nCP(id)   C.Alt(numero)\nC.Aj(persona_id) → PERSONA(id)\nVNN(persona_id)   C.Alt(persona_id)', h:['1:1 → FK en una de las dos tablas + UNIQUE (C.Alt) para que sea 1:1.']},
+ {q:'Empleado [jefe] (0,1) — supervisa — (0,N) [subordinado] Empleado', a:'EMPLEADO = dni + nombre + dni_jefe\nCP(dni)\nC.Aj(dni_jefe) → EMPLEADO(dni)      (admite NULL)', h:['Reflexiva 1:N → FK a la propia tabla.','Mínimo 0 → admite NULL (el director no tiene jefe).']},
+ {q:'Usuario [bloqueador] (0,N) — bloquea — (0,N) [bloqueado] Usuario', a:'BLOQUEO = id_bloqueador + id_bloqueado\nCP(id_bloqueador, id_bloqueado)\nC.Aj(id_bloqueador) → USUARIO(id)\nC.Aj(id_bloqueado) → USUARIO(id)', h:['Reflexiva N:M → tabla intermedia con dos FKs a la misma tabla.']},
+ {q:'Proveedor (0,N) — suministra — (0,N) Producto — (0,N) Almacén, con atributo precio', a:'SUMINISTRO = proveedor_id + producto_id + almacen_id + precio\nCP(proveedor_id, producto_id, almacen_id)\nC.Aj → PROVEEDOR, PRODUCTO, ALMACEN\nVNN(precio)', h:['Ternaria → tabla con las tres FKs y CP de las tres.']},
+ {q:'Cliente con un atributo multivalorado: teléfono', a:'TELEFONO_CLIENTE = cliente_id + telefono\nCP(cliente_id, telefono)\nC.Aj(cliente_id) → CLIENTE(id)', h:['Multivalorado → tabla aparte con CP compuesta.']},
+ {q:'Pedido (1,N) — contiene — (1,1) Línea (Línea es entidad débil con clave parcial posición)', a:'LINEA = pedido_id + posicion + producto_id\nCP(pedido_id, posicion)\nC.Aj(pedido_id) → PEDIDO(id)', h:['Débil → CP = clave del fuerte + clave parcial.']},
+ {q:'ISA parcial disyunta: Persona → Alumno | Profesor', a:'PERSONA = id + nombre         CP(id)\nALUMNO = id + curso          CP(id)  C.Aj(id) → PERSONA(id)\nPROFESOR = id + departamento CP(id)  C.Aj(id) → PERSONA(id)', h:['Una tabla por subtipo con FK a la CP del supertipo (que también es su CP).']},
+ {q:'Departamento (1,1) — tiene — (1,N) Empleado', a:'EMPLEADO = dni + nombre + codigo_depto\nCP(dni)   C.Aj(codigo_depto) → DEPARTAMENTO(codigo)   VNN(codigo_depto)\nASERCIÓN: DEPARTAMENTO[codigo] ⊆ EMPLEADO[codigo_depto]', h:['La FK sola no garantiza que todo departamento tenga empleados: aserción.']},
+ {q:'Cliente con dirección compuesta (calle, número, ciudad)', a:'CLIENTE = dni + nombre + calle + numero + ciudad\nCP(dni)', h:['Compuesto → una columna por componente.']}
+];
 })();
 </script>
 <script>// BDA-QUEST · motor del juego (mismo método que SYS-QUEST: teoría con truco, rondas de 10,
@@ -2864,6 +3124,8 @@ const ALLC = () => [...D.CASES, ...D.PCASES];
 const caseAny = id => ALLC().find(c => c.id === id);
 const fp = p => `(${p[0]},${p[1]})`;
 const strip = h => String(h).replace(/<[^>]+>/g, '');
+const noB = h => String(h).replace(/<\/?b>/g, '');          // los enunciados del examen no llevan negritas
+const lvlName = l => ({1: '🟢 Fácil', 2: '🟡 Media', 3: '🔴 Difícil'})[l] || '';
 function relText(r) {
   if (r.ternary) return `${r.ternary.map(x => `${esc(x.e)} <b>${fp(x.m)}</b>`).join(' — ')} · <b>${esc(r.verb)}</b> (ternaria)${r.attr ? ' · atributo: ' + esc(r.attr) : ''}`;
   if (r.roles) return `${esc(r.a)} <i>[rol ${esc(r.roles.a)}]</i> <b>${fp(r.na)}</b> — ${esc(r.verb)} — <b>${fp(r.nb)}</b> <i>[rol ${esc(r.roles.b)}]</i> ${esc(r.b)} (reflexiva, ${r.tipo})${r.attr ? ' · atributo: ' + esc(r.attr) : ''}`;
@@ -2883,135 +3145,287 @@ function marcoText(t, tables) {
   t.cols.filter(c => /A/.test(c[1])).forEach(c => L.push(`C.Alt(${c[0]})`));
   const groups = new Map();
   t.cols.filter(c => c[2]).forEach(c => { const k = c[2] + '#' + (c[4] || c[0]); if (!groups.has(k)) groups.set(k, {to: c[2], cols: []}); groups.get(k).cols.push(c[0]); });
-  groups.forEach(g => { const R = tables.find(x => x.name === g.to); L.push(`C.Aj(${g.cols.join(', ')}) → ${g.to}(${R ? pk(R).join(', ') : 'id'})`); });
+  groups.forEach(g => { const R = tables.find(x => x.name === g.to); L.push(`C.Aj(${g.cols.join(', ')}) → ${g.to}(${R ? pk(R).slice(0, g.cols.length).join(', ') : 'id'})`); });
   const v = t.cols.filter(c => /V/.test(c[1]) && !/P/.test(c[1])).map(c => `VNN(${c[0]})`); if (v.length) L.push(v.join('  '));
   return L.join('\n');
 }
-function subsetDet(c) {
-  const T = c.tables, t0 = T.find(t => t.cols.some(x => x[2] && x[2] !== t.name)) || T[0]; const names = [t0.name];
-  t0.cols.forEach(x => { if (x[2] && x[2] !== t0.name && !names.includes(x[2]) && names.length < 4) names.push(x[2]); });
-  return names.map(n => T.find(t => t.name === n));
+const rulesList = c => `<ol class="prules">${c.rules.map(r => `<li>${noB(r)}</li>`).join('')}</ol>`;
+
+// ---------- explicación de una sentencia SQL ("cómo se piensa") ----------
+function splitTop(s, sep) { const out = []; let d = 0, q = null, cur = ''; for (const ch of s) { if (q) { cur += ch; if (ch === q) q = null; continue; } if (ch === "'" || ch === '"') { q = ch; cur += ch; continue; } if (ch === '(') d++; if (ch === ')') d--; if (ch === sep && d === 0) { out.push(cur.trim()); cur = ''; continue; } cur += ch; } out.push(cur.trim()); return out.filter(Boolean); }
+function clausesOf(sql) {
+  const mask = sql.replace(/'[^']*'|"[^"]*"/g, m => "'" + 'x'.repeat(m.length - 2) + "'"), re = /\b(SELECT|FROM|WHERE|GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|SET|VALUES|INTO|UPDATE|DELETE)\b/gi, hits = []; let m;
+  while ((m = re.exec(mask))) { const pre = mask.slice(0, m.index); const d = (pre.match(/\(/g) || []).length - (pre.match(/\)/g) || []).length; if (d === 0) hits.push({k: m[1].toUpperCase().replace(/\s+/g, ' '), i: m.index, len: m[0].length}); }
+  return hits.map((h, n) => ({k: h.k, t: sql.slice(h.i + h.len, n + 1 < hits.length ? hits[n + 1].i : undefined).trim()}));
+}
+const cmpWord = {'=': 'es igual a', '<>': 'es distinto de', '<': 'es menor que', '>': 'es mayor que', '<=': 'es menor o igual que', '>=': 'es mayor o igual que'};
+function condText(c) {
+  let m;
+  if ((m = /^(.+?)\s+NOT\s+LIKE\s+(.+)$/i.exec(c))) return `${m[1]} NO sigue el patrón ${m[2]}`;
+  if ((m = /^(.+?)\s+LIKE\s+(.+)$/i.exec(c))) return `${m[1]} sigue el patrón ${m[2]} (% = cualquier texto, _ = una letra)`;
+  if ((m = /^(.+?)\s+BETWEEN\s+(.+?)§§(.+)$/i.exec(c))) return `${m[1]} está entre ${m[2]} y ${m[3]} (incluye los extremos)`;
+  if ((m = /^(.+?)\s+IS\s+NOT\s+NULL$/i.exec(c))) return `${m[1]} tiene valor (no es NULL)`;
+  if ((m = /^(.+?)\s+IS\s+NULL$/i.exec(c))) return `${m[1]} no tiene valor (es NULL)`;
+  if ((m = /^(.+?)\s+NOT\s+IN\s*\((.+)\)$/i.exec(c))) return `${m[1]} NO es ninguno de (${m[2]})`;
+  if ((m = /^(.+?)\s+IN\s*\((.+)\)$/i.exec(c))) return `${m[1]} es uno de (${m[2]})`;
+  if ((m = /^(.+?)\s*(<=|>=|<>|=|<|>)\s*(.+)$/.exec(c))) return `${m[1]} ${cmpWord[m[2]]} ${m[3]}`;
+  return c;
+}
+function condsText(t) {
+  const prot = t.replace(/BETWEEN\s+('[^']*'|[\w.]+)\s+AND\s+('[^']*'|[\w.]+)/gi, (_, a, b) => `BETWEEN ${a}§§${b}`);
+  const parts = prot.split(/\s+(AND|OR)\s+/i), out = [];
+  parts.forEach((p, i) => { if (i % 2) out.push(p.toUpperCase() === 'AND' ? ' y ' : ' o '); else out.push(condText(p.replace(/^\(|\)$/g, '').trim())); });
+  return out.join('');
+}
+function itemText(e) {
+  let al = null, m; if ((m = /^(.*\S)\s+AS\s+(\w+)$/i.exec(e))) { e = m[1]; al = m[2]; }
+  let d;
+  if (e === '*') d = 'todas las columnas';
+  else if ((m = /^COUNT\s*\(\s*\*\s*\)$/i.exec(e))) d = 'cuenta las filas';
+  else if ((m = /^COUNT\s*\(\s*DISTINCT\s+(.+)\)$/i.exec(e))) d = `cuenta los valores distintos de ${m[1]}`;
+  else if ((m = /^COUNT\s*\((.+)\)$/i.exec(e))) d = `cuenta los valores no nulos de ${m[1]}`;
+  else if ((m = /^(SUM|AVG|MIN|MAX)\s*\((.+)\)$/i.exec(e))) d = `${{SUM: 'suma', AVG: 'media', MIN: 'mínimo', MAX: 'máximo'}[m[1].toUpperCase()]} de ${m[2]}`;
+  else if ((m = /^ROUND\s*\((.+),\s*(\d+)\s*\)$/i.exec(e))) d = `${m[1]} redondeado a ${m[2]} decimales`;
+  else if (/^CASE\b/i.test(e)) d = 'clasifica con CASE WHEN … THEN … ELSE … END';
+  else if ((m = /^(CONCAT_WS|CONCAT)\s*\(/i.exec(e))) d = 'une textos (' + e + ')';
+  else if ((m = /^(UPPER|LOWER)\s*\((.+)\)$/i.exec(e))) d = `${m[2]} en ${m[1].toUpperCase() === 'UPPER' ? 'mayúsculas' : 'minúsculas'}`;
+  else if ((m = /^(CHAR_LENGTH|LENGTH)\s*\((.+)\)$/i.exec(e))) d = `número de caracteres de ${m[2]}`;
+  else if ((m = /^(SUBSTRING|LEFT|RIGHT)\s*\((.+)\)$/i.exec(e))) d = `trozo de texto (${e})`;
+  else if ((m = /^(YEAR|MONTH|DAY|DAYNAME|MONTHNAME|TIMESTAMPDIFF)\s*\((.+)\)$/i.exec(e))) d = `parte de una fecha (${e})`;
+  else if (/[+\-*/]/.test(e) && !/^\w+$/.test(e)) d = `cálculo: ${e}`;
+  else d = `columna ${e}`;
+  return al ? `${d} (la columna se llama «${al}»)` : d;
+}
+function explainOne(sql) {
+  sql = sql.trim().replace(/;$/, ''); const cl = clausesOf(sql), g = k => (cl.find(c => c.k === k) || {}).t, steps = [];
+  const kind = (/^\s*(SELECT|UPDATE|DELETE|INSERT)/i.exec(sql) || [])[1]; if (!kind) return '';
+  if (/^SELECT$/i.test(kind)) {
+    if (g('FROM')) steps.push(`<b>FROM</b> ${esc(g('FROM'))}: de qué tabla salen los datos.`);
+    if (g('WHERE')) steps.push(`<b>WHERE</b>: se quedan las filas en las que ${esc(condsText(g('WHERE')))}.`);
+    if (g('GROUP BY')) steps.push(`<b>GROUP BY</b> ${esc(g('GROUP BY'))}: se agrupa, una fila por cada valor.`);
+    if (g('HAVING')) steps.push(`<b>HAVING</b>: se quedan los grupos en los que ${esc(condsText(g('HAVING')))}.`);
+    const sel = g('SELECT'); if (sel) steps.push(`<b>SELECT</b>: se muestra ${splitTop(sel.replace(/^DISTINCT\s+/i, ''), ',').map(x => esc(itemText(x))).join('; ')}${/^DISTINCT/i.test(sel) ? ' (sin repetir filas: DISTINCT)' : ''}.`);
+    if (g('ORDER BY')) steps.push(`<b>ORDER BY</b>: se ordena por ${splitTop(g('ORDER BY'), ',').map(x => /\sDESC$/i.test(x) ? esc(x.replace(/\s+DESC$/i, '')) + ' de mayor a menor' : esc(x.replace(/\s+ASC$/i, '')) + ' de menor a mayor').join(', luego por ')}.`);
+    if (g('LIMIT')) steps.push(`<b>LIMIT</b> ${esc(g('LIMIT'))}: solo las ${esc(g('LIMIT'))} primeras filas.`);
+  } else if (/^UPDATE$/i.test(kind)) {
+    steps.push(`<b>UPDATE</b> ${esc(g('UPDATE'))}: tabla que se modifica.`); steps.push(`<b>SET</b>: ${splitTop(g('SET') || '', ',').map(a => esc(a.replace(/\s*=\s*/, ' pasa a valer '))).join('; ')}.`);
+    steps.push(g('WHERE') ? `<b>WHERE</b>: solo en las filas en las que ${esc(condsText(g('WHERE')))}.` : '⚠ Sin WHERE se modificarían TODAS las filas.');
+  } else if (/^DELETE$/i.test(kind)) {
+    steps.push(`<b>DELETE FROM</b> ${esc((g('FROM') || '').split(/\s+WHERE/i)[0])}: tabla de la que se borra.`);
+    steps.push(g('WHERE') ? `<b>WHERE</b>: solo las filas en las que ${esc(condsText(g('WHERE')))}.` : '⚠ Sin WHERE se borrarían TODAS las filas.');
+  } else if (/^INSERT$/i.test(kind)) {
+    const m = /INSERT\s+INTO\s+(\w+)\s*(\(([^)]*)\))?\s*VALUES\s*(.+)$/is.exec(sql); if (m) { steps.push(`<b>INSERT INTO</b> ${esc(m[1])}: tabla donde se añade.`); steps.push(m[3] ? `Columnas: ${esc(m[3])} (los valores van en ese mismo orden).` : 'Sin lista de columnas: un valor por cada columna de la tabla, en su orden.'); steps.push(`<b>VALUES</b> ${esc(m[4])}: ${splitTop(m[4].replace(/\)\s*,\s*\(/g, '),(').replace(/^\(|\)$/g, ''), ',').length ? 'una fila por cada paréntesis.' : ''}`); }
+  }
+  return `<ol class="plist">${steps.map(s => `<li>${s}</li>`).join('')}</ol>`;
+}
+function explainSql(sql) { const parts = String(sql).split(/;\s*(?=(?:SELECT|UPDATE|DELETE|INSERT)\b)/i); return `<h4>Cómo se piensa (en el orden en que MySQL lo ejecuta)</h4>` + parts.map((p, i) => `${parts.length > 1 ? `<p class="small">Sentencia ${i + 1}</p>` : ''}${explainOne(p)}`).join('') + '<p class="small">Orden real: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT.</p>'; }
+
+// ---------- generador de DDL (modelo → texto) con errores plantados ----------
+const lcs = s => String(s).toLowerCase();
+function pluralOf(n) { n = lcs(n); return /[aeiou]$/.test(n) ? n + 's' : n + 'es'; }
+function ddlModel(tables, names) {
+  const byName = n => tables.find(t => t.name === n), pkOf = t => t.cols.filter(c => /P/.test(c[1])).map(c => c[0]), cache = {};
+  const typeOf = (t, c, depth = 0) => { const k = t.name + '.' + c[0]; if (cache[k]) return cache[k]; let ty;
+    if (c[2] && depth < 6) { const R = byName(c[2]); const grp = t.cols.filter(x => x[2] === c[2] && (x[4] || x[0]) === (c[4] || c[0])); const idx = Math.max(0, grp.findIndex(x => x[0] === c[0])); const rp = R ? pkOf(R) : []; const rc = R && R.cols.find(x => x[0] === (rp[idx] || rp[0])); ty = rc ? typeOf(R, rc, depth + 1) : D.guessType(c[0]); } else ty = D.guessType(c[0]);
+    return cache[k] = ty; };
+  return (names ? tables.filter(t => names.includes(t.name)) : tables.slice()).map(t => {
+    const pk = pkOf(t), groups = new Map();
+    t.cols.filter(c => c[2]).forEach(c => { const k = c[2] + '#' + (c[4] || c[0]); if (!groups.has(k)) groups.set(k, {ref: c[2], cols: []}); groups.get(k).cols.push(c[0]); });
+    const fks = [...groups.values()].map(g => { const R = byName(g.ref); return {cols: g.cols, ref: g.ref, refCols: (R ? pkOf(R) : ['id']).slice(0, g.cols.length)}; });
+    return {name: t.name, pk, fks, cols: t.cols.map(c => { const ty = typeOf(t, c); return {n: c[0], type: ty, auto: pk.length === 1 && pk[0] === c[0] && !c[2] && /INT/.test(ty) && /^id/.test(lcs(c[0])), nn: /V|P/.test(c[1]), uq: /A/.test(c[1]), opt: /o/.test(c[1])}; })};
+  });
+}
+function renderDdl(model) {
+  const lines = [], nameOf = n => { const t = model.find(x => x.name === n); return t && t.plural ? pluralOf(n) : lcs(n); };
+  model.forEach((t, ti) => {
+    if (ti) lines.push({text: '', errs: []});
+    lines.push({text: `CREATE TABLE ${nameOf(t.name)} (`, errs: t.errCreate || []});
+    const body = [];
+    t.cols.forEach(c => body.push({text: `  ${c.n} ${c.type}${c.auto ? ' AUTO_INCREMENT' : ''}${c.nn && !c.dropNN || c.addNN ? ' NOT NULL' : ''}${c.uq && !c.dropUQ ? ' UNIQUE' : ''}${t.dupPk && t.pk.length === 1 && t.pk[0] === c.n ? ' PRIMARY KEY' : ''}`, errs: c.errs || []}));
+    if (!t.noPk) { const pk = t.shortPk ? t.pk.slice(0, 1) : t.pk; body.push({text: `  PRIMARY KEY (${pk.join(', ')})`, errs: t.errPk || []}); }
+    t.fks.forEach(f => { if (f.dropped) return; const ref = f.wrong || f.ref, rc = f.wrong ? f.wrongCols : f.refCols; body.push({text: `  FOREIGN KEY (${f.cols.join(', ')}) REFERENCES ${nameOf(ref)}(${rc.join(', ')})`, errs: f.errs || []}); });
+    body.forEach((b, i) => lines.push({text: b.text + (i < body.length - 1 ? ',' : ''), errs: b.errs}));
+    lines.push({text: ');', errs: []});
+  });
+  return lines;
+}
+function mutateDdl(model, k) {
+  const errors = []; let uid = 0; const used = new Set(), pick1 = a => a[Math.floor(Math.random() * a.length)];
+  const add = (target, html) => { const id = 'g' + (++uid); (target.errs = target.errs || []).push(id); errors.push({id, model: html}); };
+  const kinds = ['dropNN', 'addNN', 'dropUQ', 'dropFK', 'wrongFK', 'shortPk', 'noPk', 'plural', 'order', 'dupPk', 'dropNN', 'dropFK'];
+  for (let tries = 0; tries < 60 && errors.length < k; tries++) {
+    const kind = pick1(kinds), t = pick1(model), key = t.name;
+    if (kind === 'dropNN') { const cs = t.cols.filter(c => c.nn && !c.dropNN && !t.pk.includes(c.n) && !used.has(key + c.n)); if (!cs.length) continue; const c = pick1(cs); used.add(key + c.n); c.dropNN = true; add(c, `<code>${t.name}.${c.n}</code> es <b>obligatorio</b> (el enunciado no dice que pueda faltar): falta <b>NOT NULL</b>.`); }
+    else if (kind === 'addNN') { const cs = t.cols.filter(c => c.opt && !c.addNN && !used.has(key + c.n)); if (!cs.length) continue; const c = pick1(cs); used.add(key + c.n); c.addNN = true; add(c, `<code>${t.name}.${c.n}</code> es <b>opcional</b> (puede no tener valor): sobra el NOT NULL.`); }
+    else if (kind === 'dropUQ') { const cs = t.cols.filter(c => c.uq && !c.dropUQ && !used.has(key + c.n)); if (!cs.length) continue; const c = pick1(cs); used.add(key + c.n); c.dropUQ = true; add(c, `<code>${t.name}.${c.n}</code> es clave alternativa (no puede repetirse): falta <b>UNIQUE</b>.`); }
+    else if (kind === 'dropFK') { const fs = t.fks.filter(f => !f.dropped && !f.wrong && !used.has(key + f.cols[0])); if (!fs.length) continue; const f = pick1(fs); used.add(key + f.cols[0]); f.dropped = true; const last = t.cols.find(c => c.n === f.cols[f.cols.length - 1]); add(last, `<b>Falta la FOREIGN KEY</b> <code>FOREIGN KEY (${f.cols.join(', ')}) REFERENCES ${lcs(f.ref)}(${f.refCols.join(', ')})</code> en ${t.name}.`); }
+    else if (kind === 'wrongFK') { const fs = t.fks.filter(f => !f.dropped && !f.wrong && f.cols.length === 1 && !used.has(key + f.cols[0])); if (!fs.length) continue; const f = pick1(fs); const others = model.filter(x => x.name !== f.ref && x.name !== t.name && x.pk.length === 1); if (!others.length) continue; const o = pick1(others); used.add(key + f.cols[0]); f.wrong = o.name; f.wrongCols = o.pk.slice(0, 1); add(f, `La FK de <code>${t.name}.${f.cols[0]}</code> apunta a <b>la tabla equivocada</b> (<code>${lcs(o.name)}</code>): debe ser <code>REFERENCES ${lcs(f.ref)}(${f.refCols.join(', ')})</code>.`); }
+    else if (kind === 'shortPk') { if (t.pk.length < 2 || t.shortPk || t.noPk || used.has('pk' + key)) continue; used.add('pk' + key); t.shortPk = true; add({get errs() { return t.errPk; }, set errs(v) { t.errPk = v; }}, `La CP de <code>${t.name}</code> debe ser <b>compuesta</b> <code>(${t.pk.join(', ')})</code>. Con solo <code>${t.pk[0]}</code> la tabla admitiría una única fila por ${t.pk[0]}.`); }
+    else if (kind === 'noPk') { if (t.noPk || t.shortPk || t.dupPk || used.has('pk' + key)) continue; used.add('pk' + key); t.noPk = true; add({get errs() { return t.errCreate; }, set errs(v) { t.errCreate = v; }}, `<b>${t.name} no tiene clave primaria</b>: debe ser <code>PRIMARY KEY (${t.pk.join(', ')})</code>.`); }
+    else if (kind === 'plural') { if (t.plural || used.has('n' + key)) continue; used.add('n' + key); t.plural = true; add({get errs() { return t.errCreate; }, set errs(v) { t.errCreate = v; }}, `<b>Nombre en plural</b>: las tablas se nombran en <b>singular</b> (<code>${lcs(t.name)}</code>, no <code>${pluralOf(t.name)}</code>).`); }
+    else if (kind === 'dupPk') { if (t.pk.length !== 1 || t.dupPk || t.noPk || used.has('pk' + key)) continue; used.add('pk' + key); t.dupPk = true; add({get errs() { return t.errPk; }, set errs(v) { t.errPk = v; }}, `<b>PRIMARY KEY dos veces</b> sobre <code>${t.pk[0]}</code> en ${t.name}: ya la lleva en su línea; una tabla tiene una sola clave primaria.`); }
+    else if (kind === 'order') { const i = model.indexOf(t), f = t.fks.find(f => !f.dropped && !f.wrong && f.ref !== t.name && model.indexOf(model.find(x => x.name === f.ref)) < i && !used.has('o' + key)); if (!f) continue; const ri = model.indexOf(model.find(x => x.name === f.ref)); used.add('o' + key); model.splice(i + 1, 0, model.splice(ri, 1)[0]); add(f, `<b>Orden de creación</b>: <code>${lcs(t.name)}</code> tiene una FK hacia <code>${lcs(f.ref)}</code>, que se crea <b>después</b>. Hay que crear antes la tabla referenciada.`); }
+  }
+  return errors;
+}
+
+// ---------- chuletas ----------
+const CHULETA = {
+  dml: '<ol class="plist"><li>Orden: <code>SELECT · FROM · WHERE · GROUP BY · HAVING · ORDER BY · LIMIT</code>.</li><li>Una fila / unas filas concretas: <code>WHERE clave = valor</code>. UPDATE y DELETE <b>siempre</b> con WHERE.</li><li>NULL: <code>IS NULL</code> / <code>IS NOT NULL</code> (nunca = NULL).</li><li>Texto y fechas entre comillas simples; fechas <code>\'AAAA-MM-DD\'</code>.</li><li>LIKE: <code>%</code> = cualquier texto, <code>_</code> = una letra. BETWEEN incluye los extremos.</li><li>AND/OR mezclados → paréntesis. Varias columnas en SET → comas.</li><li>Agregados: COUNT, SUM, AVG, MIN, MAX. Columna normal + agregado → GROUP BY. Filtrar filas → WHERE; filtrar grupos → HAVING.</li><li>Los N mayores: <code>ORDER BY col DESC LIMIT N</code>. Sin repetir: DISTINCT.</li><li>Funciones: CONCAT, UPPER, LOWER, CHAR_LENGTH, SUBSTRING, ROUND, YEAR, MONTH, DAYNAME, CASE WHEN.</li><li>INSERT: <code>INSERT INTO t (cols) VALUES (...)</code>, valores en el orden de las columnas.</li><li>Borrar un padre con hijos: primero los hijos.</li></ol>',
+  ddl: '<ol class="plist"><li>Una tabla por entidad (<b>singular</b>) y una intermedia por cada N:M / ternaria / multivalorado.</li><li>Crea primero las tablas a las que apuntan otras (orden).</li><li>Por tabla: columnas con tipo → <code>NOT NULL</code> si es obligatorio → <code>PRIMARY KEY</code> (compuesta una sola vez) → <code>UNIQUE</code> en alternativas → <code>FOREIGN KEY (x) REFERENCES T(pk)</code>.</li><li>Si el enunciado da un identificador natural (DNI, matrícula, ISBN...) esa es la CP; solo hay <code>id</code> si el enunciado lo da o no hay ninguna clave.</li><li>FK obligatoria (mínimo 1) → NOT NULL; opcional (mínimo 0) → sin NOT NULL. La FK y la columna referenciada, del mismo tipo.</li><li>Tipos: INT, VARCHAR(n), CHAR(n), DATE, DATETIME, DECIMAL(8,2), ENUM(\'a\',\'b\').</li><li>Sin consultas en el DDL.</li></ol>',
+  er: '<ol class="plist"><li>Entidades = sustantivos con identificador, en <b>singular</b>. Verbos = relaciones. Datos = atributos.</li><li>Por atributo: identificador (subrayado), opcional, multivalorado (doble óvalo), compuesto, derivado.</li><li>Par (min,max) <b>pegado a la entidad que se cuenta</b>: Cliente (1,1) — realiza — (0,N) Pedido = cada pedido, exactamente 1 cliente; un cliente, 0 a N pedidos. Escribe la frase.</li><li>«Puede / ninguno» → 0 · «siempre / exactamente / al menos uno / todo» → 1 · «varios» → N.</li><li>Reflexiva: mismo nombre en las dos puntas + rol en cada una. Ternaria: tres pares y atributos colgando del rombo.</li><li>Si la misma pareja se repite en fechas distintas, la relación pasa a ser una entidad.</li><li>Entidad débil: no se identifica sola (doble rectángulo, rombo doble, clave parcial). ISA: parcial/total, disyunta/solapada.</li></ol>',
+  tab: '<ol class="plist"><li>Una tabla por entidad, por N:M, por ternaria y por atributo multivalorado. Nombres en singular y mayúsculas.</li><li>1:N → FK en la tabla del lado N. N:M → intermedia con las dos FKs y CP compuesta (atributos de la relación ahí).</li><li>Mínimo 1 → VNN en la FK · mínimo 0 → admite NULL. 1:1 → FK + C.Alt (UNIQUE).</li><li>Reflexiva 1:N → FK a la propia tabla. Ternaria → 3 FKs y CP de las tres. Débil → CP = clave del fuerte + parcial.</li><li><b>Existencialidad</b>: mínimo 1 en la entidad del lado "1" → ASERCIÓN <code>PADRE[clave] ⊆ HIJA[fk]</code>. ISA total → <code>SUP ⊆ SUB1 ∪ SUB2</code>; disyunta → <code>SUB1 ∩ SUB2 = ∅</code>.</li><li>Por tabla: CP · C.Alt · C.Aj · VNN.</li></ol>',
+  norm: '<ol class="plist"><li>1FN: sin grupos repetidos {} ni valores compuestos → sácalos a otra tabla con la clave del padre.</li><li>2FN: ningún atributo depende de solo una parte de la clave compuesta.</li><li>3FN: ningún atributo depende de otro no clave (transitiva).</li><li>FNBC: todo determinante es clave candidata.</li></ol>'};
+const chuletaFor = id => { const k = id.split(':')[0]; return k.startsWith('dml') ? CHULETA.dml : k.startsWith('ddl') ? CHULETA.ddl : (k === 'er' || k === 'card0' || k === 'card1') ? CHULETA.er : (k === 'tab' || k === 'tab0') ? CHULETA.tab : k === 'norm' ? CHULETA.norm : ''; };
+
+// ---------- niveles y minutos ----------
+function dmlLevel(t) { if (t.lvl) return t.lvl; const r = [].concat(t.ref || t.bad).join(' '); return /HAVING|CASE|TIMESTAMPDIFF|;\s*\w|ROUND\(.*AVG/i.test(r) || [].concat(t.ref || []).length > 1 ? 3 : /GROUP BY|BETWEEN|LIKE|IN \(|DISTINCT|LIMIT|CONCAT|YEAR|MONTH|SUBSTRING|UPDATE|DELETE|INSERT/i.test(r) ? 2 : 1; }
+function paperMeta(id) {
+  const k = id.split(':')[0], rest = id.split(':').slice(1).join(':');
+  if (k === 'er' || k === 'tab') { const c = caseAny(rest), n = T2.erOf(c).entities.length; return {title: `${k === 'er' ? 'E/R' : 'Tablas'} · ${c.name}`, level: c.level || 2, min: k === 'er' ? 3 + 2 * n : 2 + 2 * c.tables.length}; }
+  if (k === 'ddlv') { const c = caseAny(rest); return {title: `DDL validar · ${c.name}`, level: c.level || 2, min: 7}; }
+  if (k === 'ddlg') { const c = caseAny(rest); return {title: `DDL con errores (generado) · ${c.name}`, level: c.level || 2, min: 6}; }
+  if (k === 'ddlw' || k === 'ddlh') { const c = caseAny(rest), n = ddlNames(c, k === 'ddlh').length; return {title: `DDL ${k === 'ddlh' ? 'solo enunciado' : 'desde cero'} · ${c.name}`, level: k === 'ddlh' ? 3 : (c.level || 2), min: 2 + 2 * n}; }
+  if (k === 'dmlr') { const t = D.DMLR.find(x => x.id === rest); return {title: `DML revisar · ${t.title}`, level: dmlLevel(t), min: 3}; }
+  if (k === 'dmlw') { const t = D.DMLW.find(x => x.id === rest), l = dmlLevel(t); return {title: `DML desde cero · ${t.title}`, level: l, min: l === 1 ? 2 : l === 2 ? 4 : 6}; }
+  if (k === 'norm') { const t = D.NORM.find(x => x.id === rest); return {title: `Normalización · ${t.title}`, level: /6[a-f]/.test(t.id) ? 1 : 3, min: /6[a-f]/.test(t.id) ? 3 : 8}; }
+  if (k === 'card0') return {title: 'Cardinalidades (boletín 0)', level: 1, min: 8};
+  if (k === 'card1') return {title: `Relámpago pares · ${+rest + 1}`, level: 1, min: 2};
+  if (k === 'tab0') return {title: `Relámpago tablas · ${+rest + 1}`, level: 1, min: 3};
+  return {title: id, level: 2, min: 5};
 }
 
 // ---------- construcción de cada ejercicio ----------
 function paperItem(id) {
-  const [k, rest] = [id.split(':')[0], id.split(':').slice(1).join(':')];
-  if (k === 'er') return itemER(caseAny(rest));
-  if (k === 'tab') return itemTab(caseAny(rest));
-  if (k === 'ddlv') return itemDdlV(caseAny(rest));
-  if (k === 'ddlw') return itemDdlW(caseAny(rest));
-  if (k === 'dmlr') return itemDmlR(D.DMLR.find(t => t.id === rest));
-  if (k === 'dmlw') return itemDmlW(D.DMLW.find(t => t.id === rest));
-  if (k === 'norm') return itemNorm(D.NORM.find(t => t.id === rest));
-  if (k === 'card0') return itemCard0();
+  const k = id.split(':')[0], rest = id.split(':').slice(1).join(':'); let it;
+  if (k === 'er') it = itemER(caseAny(rest)); else if (k === 'tab') it = itemTab(caseAny(rest)); else if (k === 'ddlv') it = itemDdlV(caseAny(rest)); else if (k === 'ddlg') it = itemDdlG(caseAny(rest));
+  else if (k === 'ddlw') it = itemDdlW(caseAny(rest), false); else if (k === 'ddlh') it = itemDdlW(caseAny(rest), true);
+  else if (k === 'dmlr') it = itemDmlR(D.DMLR.find(t => t.id === rest)); else if (k === 'dmlw') it = itemDmlW(D.DMLW.find(t => t.id === rest));
+  else if (k === 'norm') it = itemNorm(D.NORM.find(t => t.id === rest)); else if (k === 'card0') it = itemCard0(); else if (k === 'card1') it = itemCard1(+rest); else if (k === 'tab0') it = itemTab0(+rest);
+  const m = paperMeta(id); it.level = m.level; it.min = m.min; it.chuleta = chuletaFor(id); return it;
 }
-const rulesList = c => `<ol class="prules">${c.rules.map(r => `<li>${r}</li>`).join('')}</ol>`;
 function itemER(c) {
   const er = T2.erOf(c), hints = [
-    `Subraya en el enunciado los <b>sustantivos con identificador</b>: serán entidades. Hay <b>${er.entities.length}</b>. Todas en <b>singular</b>.`,
+    `Subraya en el enunciado los sustantivos con identificador: serán entidades. Hay ${er.entities.length}. Todas en singular.`,
     `Las entidades empiezan por: ${er.entities.map(e => esc(e.n[0]) + '…').join(', ')}.`,
-    `Busca los <b>verbos</b>: hay <b>${c.rels.length}</b> relaciones${c.rels.some(r => r.roles) ? ' (alguna es <b>reflexiva</b>: pon un rol en cada punta)' : ''}${c.rels.some(r => r.ternary) ? ' (una es <b>ternaria</b>: tres pares)' : ''}.`,
-    'Cada par: «puede / ninguno» → 0 · «siempre / exactamente / al menos uno / todo» → 1 · «varios / muchos» → N. Pon el par <b>pegado a la entidad que se cuenta</b> y escribe la frase al lado.',
-    `Atributos: subraya el identificador${er.entities.some(e => e.attrs.some(a => /o/.test(a[1]))) ? ', marca los <b>opcionales</b>' : ''}${er.entities.some(e => e.attrs.some(a => /m/.test(a[1]))) ? ', dobla el óvalo de los <b>multivalorados</b>' : ''}. Lo que no se dice que es opcional es obligatorio.`];
+    `Busca los verbos: hay ${c.rels.length} relaciones${c.rels.some(r => r.roles) ? ' (alguna es reflexiva: pon un rol en cada punta)' : ''}${c.rels.some(r => r.ternary) ? ' (una es ternaria: tres pares)' : ''}.`,
+    'Cada par: «puede / ninguno» → 0 · «siempre / exactamente / al menos uno / todo» → 1 · «varios / muchos» → N. Pon el par pegado a la entidad que se cuenta y escribe la frase al lado.',
+    `Atributos: subraya el identificador${er.entities.some(e => e.attrs.some(a => /o/.test(a[1]))) ? ', marca los opcionales' : ''}${er.entities.some(e => e.attrs.some(a => /m/.test(a[1]))) ? ', dobla el óvalo de los multivalorados' : ''}. Lo que no se dice que es opcional es obligatorio.`];
   const rub = [`Entidades en <b>singular</b>: ${er.entities.map(e => esc(e.n)).join(', ')}`,
-    ...er.entities.map(e => `Identificador de <b>${esc(e.n)}</b>: ${esc(e.attrs.filter(a => /I|p/.test(a[1])).map(a => a[0]).join(' + '))}${e.attrs.some(a => /o/.test(a[1])) ? ' · opcionales: ' + esc(e.attrs.filter(a => /o/.test(a[1])).map(a => a[0]).join(', ')) : ''}${e.attrs.some(a => /m/.test(a[1])) ? ' · multivalorados: ' + esc(e.attrs.filter(a => /m/.test(a[1])).map(a => a[0]).join(', ')) : ''}`),
+    ...er.entities.map(e => `Identificador de <b>${esc(e.n)}</b>: ${esc(e.attrs.filter(a => /I|p/.test(a[1])).map(a => a[0]).join(' + ') || '(subtipo: hereda el del supertipo)')}${e.attrs.some(a => /o/.test(a[1])) ? ' · opcionales: ' + esc(e.attrs.filter(a => /o/.test(a[1])).map(a => a[0]).join(', ')) : ''}${e.attrs.some(a => /m/.test(a[1])) ? ' · multivalorados: ' + esc(e.attrs.filter(a => /m/.test(a[1])).map(a => a[0]).join(', ')) : ''}`),
     ...c.rels.map(relText), ...(c.decisions || []).map(d => `${esc(d.title)}: ${esc(d.opts.find(o => o[1])[0])}`), ...(c.extra || []).map(strip).map(esc)];
   const sol = `<h4>Entidades y atributos</h4><ul class="plist">${er.entities.map(e => `<li>${entText(e)}</li>`).join('')}</ul><h4>Relaciones (par pegado a la entidad que se cuenta)</h4><ul class="plist">${c.rels.map(r => `<li>${relText(r)}<br><span class="small">${esc(r.why || '')}</span></li>`).join('')}</ul>${(c.decisions || []).length ? `<h4>Decisiones de modelado</h4><ul class="plist">${c.decisions.map(d => `<li><b>${esc(d.title)}:</b> ${esc(d.opts.find(o => o[1])[0])}<br><span class="small">${esc(d.opts.find(o => o[1])[2])}</span></li>`).join('')}</ul>` : ''}${(c.extra || []).length ? `<h4>Detalles</h4><ul class="plist">${c.extra.map(x => `<li>${x}</li>`).join('')}</ul>` : ''}${(er.traps || []).length ? `<p class="small">No son entidades: ${er.traps.map(t => esc(t.n)).join(', ')}.</p>` : ''}<h4>Dibujo</h4>${c.img ? `<img src="${c.img}" alt="E/R" style="max-width:100%;background:#fff">` : T2.erSvg(c)}<p class="small">Dibujo simplificado (sin atributos ni ISA/débiles): compara entidades y pares.</p>`;
-  return {id: 'er:' + c.id, part: 1, title: `E/R · ${c.name}`, src: c.from, statement: `${rulesList(c)}<p><b>Dibuja el E/R:</b> entidades (singular), atributos (identificador subrayado, opcionales, multivalorados), relaciones con su <b>(min,max)</b>, roles en las reflexivas y atributos de las relaciones.</p>`, hints, solution: sol, rubric: rub};
+  return {id: 'er:' + c.id, part: 1, title: `E/R · ${c.name}`, src: c.from, statement: `${rulesList(c)}<p>Dibuja el E/R: entidades (singular), atributos (identificador subrayado, opcionales, multivalorados), relaciones con su (min,max), roles en las reflexivas y atributos de las relaciones.</p>`, hints, solution: sol, rubric: rub};
 }
 function itemTab(c) {
   const er = T2.erOf(c), tables = c.tables;
   const fig = c.img ? `<img src="${c.img}" alt="E/R" style="max-width:100%;background:#fff">` : T2.erSvg(c);
   const hasRefl = c.rels.some(r => r.roles), hasTern = c.rels.some(r => r.ternary);
   const hints = [
-    `Pasan a tabla las <b>entidades</b> (${er.entities.length}) más una tabla por cada <b>N:M</b>${hasTern ? ' y por la <b>ternaria</b>' : ''}${er.entities.some(e => e.attrs.some(a => /m/.test(a[1]))) ? ' y por cada atributo <b>multivalorado</b>' : ''}. Total: <b>${tables.length}</b> tablas. Nombres en <b>singular y mayúsculas</b>.`,
-    'En cada <b>1:N</b> la FK va en la tabla del lado N. En cada <b>N:M</b>, tabla intermedia con las dos FKs y CP compuesta (los atributos de la relación van ahí).',
-    `Nulabilidad de cada FK: mínimo <b>1</b> → VNN (NOT NULL); mínimo <b>0</b> → admite NULL.${hasRefl ? ' La reflexiva es una FK a la misma tabla.' : ''}${hasTern ? ' En la ternaria, CP = las tres FKs.' : ''}`,
-    `<b>Existencialidad:</b> mira los pares con mínimo 1 en la entidad del lado "1" (todo X tiene al menos un Y): no sale de la FK, se escribe una ASERCIÓN <code>X[clave] ⊆ Y[fk]</code>.${(c.asserts || []).length ? ' Aquí hay ' + c.asserts.length + '.' : ' Aquí quizá no haga falta ninguna.'}`,
+    `Pasan a tabla las entidades (${er.entities.length}) más una tabla por cada N:M${hasTern ? ' y por la ternaria' : ''}${er.entities.some(e => e.attrs.some(a => /m/.test(a[1]))) ? ' y por cada atributo multivalorado' : ''}. Total: ${tables.length} tablas. Nombres en singular y mayúsculas.`,
+    'En cada 1:N la FK va en la tabla del lado N. En cada N:M, tabla intermedia con las dos FKs y CP compuesta (los atributos de la relación van ahí).',
+    `Nulabilidad de cada FK: mínimo 1 → VNN (NOT NULL); mínimo 0 → admite NULL.${hasRefl ? ' La reflexiva es una FK a la misma tabla.' : ''}${hasTern ? ' En la ternaria, CP = las tres FKs.' : ''}`,
+    `Existencialidad: mira los pares con mínimo 1 en la entidad del lado "1" (todo X tiene al menos un Y): no sale de la FK, se escribe una ASERCIÓN X[clave] ⊆ Y[fk].${(c.asserts || []).length ? ' Aquí hay ' + c.asserts.length + '.' : ' Aquí quizá no haga falta ninguna.'}`,
     'Para cada tabla repasa las 5 preguntas: CP · C.Alt (únicos) · C.Aj (a quién apunta) · VNN (obligatorios) · ¿CP compuesta?'];
   const rub = [...tables.map(t => `<b>${esc(t.name)}</b>: ${esc(marcoText(t, tables).replace(/\n/g, ' · '))}`), ...(c.asserts || []).map(a => `ASERCIÓN: <code>${esc(a.t)}</code>`), ...((c.asserts || []).length ? [] : ['No invento aserciones: ningún mínimo 1 en el lado "1"']), 'Tablas en singular y en mayúsculas'];
   const sol = `<pre class="code">${esc(tables.map(t => marcoText(t, tables)).join('\n\n'))}${(c.asserts || []).length ? '\n\n' + esc(c.asserts.map((a, i) => `ASERCIÓN ${i + 1}: ${a.t}`).join('\n')) : ''}</pre>${tables.filter(t => t.note).map(t => `<p class="small"><b>${esc(t.name)}:</b> ${esc(t.note)}</p>`).join('')}${(c.asserts || []).map(a => `<p class="small">${esc(a.why)}</p>`).join('')}`;
-  return {id: 'tab:' + c.id, part: 2, title: `Paso a tablas · ${c.name}`, src: c.from, statement: `${fig}<h4>Atributos</h4><ul class="plist">${er.entities.map(e => `<li>${entText(e)}</li>`).join('')}</ul><h4>Relaciones (par pegado a la entidad que se cuenta)</h4><ul class="plist">${c.rels.map(r => `<li>${relText(r)}</li>`).join('')}</ul>${(c.extra || []).length ? `<ul class="plist small">${c.extra.map(x => `<li>${x}</li>`).join('')}</ul>` : ''}<p><b>Haz el paso a tablas</b> con la notación de marco: CP, C.Alt, C.Aj, VNN y las <b>restricciones de existencialidad</b> (aserciones) que exija el diagrama.</p>`, hints, solution: sol, rubric: rub};
+  return {id: 'tab:' + c.id, part: 2, title: `Paso a tablas · ${c.name}`, src: c.from, statement: `${fig}<h4>Atributos</h4><ul class="plist">${er.entities.map(e => `<li>${entText(e)}</li>`).join('')}</ul><h4>Relaciones (par pegado a la entidad que se cuenta)</h4><ul class="plist">${c.rels.map(r => `<li>${relText(r)}</li>`).join('')}</ul>${(c.extra || []).length ? `<ul class="plist small">${c.extra.map(x => `<li>${x}</li>`).join('')}</ul>` : ''}<p>Haz el paso a tablas con la notación de marco: CP, C.Alt, C.Aj, VNN y las restricciones de existencialidad (aserciones) que exija el diagrama.</p>`, hints, solution: sol, rubric: rub};
 }
 function itemDdlV(c) {
   const lines = parseDDL(c.ddl), ids = Object.keys(c.errors);
   const num = lines.map((l, i) => `${String(i + 1).padStart(2)}  ${l.text}`).join('\n');
   const prim = e => lines.findIndex(l => l.errs.includes(e)) + 1;
-  const hints = [`Hay <b>${ids.length} errores</b> respecto al enunciado.`, 'Recorre tabla a tabla: ¿PK? ¿FKs (y a qué tabla/columna)? ¿NOT NULL donde toca y solo donde toca? ¿UNIQUE? ¿orden de creación? ¿nombres en singular?', `Errores en las líneas: ${ids.map(prim).sort((a, b) => a - b).join(', ')}.`, 'En el porqué, cita la regla del enunciado (R1, R2...) y di cómo quedaría bien.'];
-  return {id: 'ddlv:' + c.id, part: 3, title: `DDL: validar · ${c.name}`, src: c.from, statement: `${rulesList(c)}<p><b>Marca las líneas con error y explica por qué</b> (campo libre). Si falta algo, indica dónde debería ir.</p><pre class="code">${esc(num)}</pre>`, hints,
+  const hints = [`Hay ${ids.length} errores respecto al enunciado.`, 'Recorre tabla a tabla: ¿PK? ¿FKs (y a qué tabla/columna)? ¿NOT NULL donde toca y solo donde toca? ¿UNIQUE? ¿orden de creación? ¿nombres en singular?', `Errores en las líneas: ${ids.map(prim).sort((a, b) => a - b).join(', ')}.`, 'En el porqué, cita la regla del enunciado (R1, R2...) y di cómo quedaría bien.'];
+  return {id: 'ddlv:' + c.id, part: 3, title: `DDL: validar · ${c.name}`, src: c.from, statement: `${rulesList(c)}<p>Marca las líneas con error y explica por qué (campo libre). Si falta algo, indica dónde debería ir.</p><pre class="code">${esc(num)}</pre>`, hints,
     solution: `<ol class="plist">${ids.map(e => `<li><b>Línea ${prim(e)}:</b> ${c.errors[e].model}</li>`).join('')}</ol>`, rubric: ids.map(e => `Línea ${prim(e)} encontrada y explicada: ${esc(strip(c.errors[e].model).slice(0, 110))}…`)};
 }
-function itemDdlW(c) {
-  const sub = subsetDet(c), spec = specOf(c, sub);
-  const rub = []; spec.forEach(t => { const pk = t.cols.filter(x => /P/.test(x[1])).map(x => x[0]); rub.push(`<b>${esc(t.name)}</b>: PRIMARY KEY (${esc(pk.join(', '))})`);
-    t.cols.filter(x => x[2]).forEach(x => rub.push(`FK ${esc(t.name)}.${esc(x[0])} → ${esc(x[2])}`));
+function itemDdlG(c) {
+  const k = (c.level || 2) === 1 ? 3 : (c.level || 2) === 2 ? 4 : 6, model = ddlModel(c.tables), errors = mutateDdl(model, k), lines = renderDdl(model);
+  const num = lines.map((l, i) => `${String(i + 1).padStart(2)}  ${l.text}`).join('\n'), where = id => lines.findIndex(l => l.errs.includes(id)) + 1;
+  const hints = [`Hay ${errors.length} errores respecto al enunciado.`, 'Recorre tabla a tabla: ¿PK completa? ¿FKs (y a qué tabla)? ¿NOT NULL donde toca y solo donde toca? ¿UNIQUE? ¿orden de creación? ¿nombres en singular?', `Errores en las líneas: ${errors.map(e => where(e.id)).sort((a, b) => a - b).join(', ')}.`, 'En el porqué, cita la regla del enunciado y di cómo quedaría bien.'];
+  return {id: 'ddlg:' + c.id, part: 3, title: `DDL con errores · ${c.name}`, src: 'Generado: cada vez salen errores distintos', statement: `${rulesList(c)}<p>Marca las líneas con error y explica por qué (campo libre). Si falta algo, indica dónde debería ir.</p><pre class="code">${esc(num)}</pre>`, hints,
+    solution: `<ol class="plist">${errors.map(e => `<li><b>Línea ${where(e.id)}:</b> ${e.model}</li>`).join('')}</ol><details class="rules"><summary>Ver el DDL correcto</summary><pre class="code">${esc(renderDdl(ddlModel(c.tables)).map(l => l.text).join('\n'))}</pre></details>`, rubric: errors.map(e => `Línea ${where(e.id)} encontrada y explicada: ${esc(strip(e.model).slice(0, 100))}…`)};
+}
+function ddlNames(c, hard) { const T = c.tables; if (T.length <= (hard ? 7 : 4)) return T.map(t => t.name); if (hard) return []; const t0 = T.find(t => t.cols.some(x => x[2] && x[2] !== t.name)) || T[0], names = [t0.name]; t0.cols.forEach(x => { if (x[2] && x[2] !== t0.name && !names.includes(x[2]) && names.length < 4) names.push(x[2]); }); return names; }
+function itemDdlW(c, hard) {
+  const names = ddlNames(c, hard), sub = names.map(n => c.tables.find(t => t.name === n)), model = ddlModel(c.tables, names), sol = renderDdl(model).map(l => l.text).join('\n');
+  const rub = []; sub.forEach(t => { const pk = t.cols.filter(x => /P/.test(x[1])).map(x => x[0]); rub.push(`<b>${esc(t.name)}</b>: PRIMARY KEY (${esc(pk.join(', '))})`);
+    const groups = new Map(); t.cols.filter(x => x[2] && names.includes(x[2])).forEach(x => { const g = x[2] + '#' + (x[4] || x[0]); if (!groups.has(g)) groups.set(g, {to: x[2], cols: []}); groups.get(g).cols.push(x[0]); }); groups.forEach(g => rub.push(`FK ${esc(t.name)}(${esc(g.cols.join(', '))}) → ${esc(g.to)}`));
     const nn = t.cols.filter(x => /V/.test(x[1]) && !/P/.test(x[1])).map(x => x[0]); if (nn.length) rub.push(`NOT NULL en ${esc(t.name)}: ${esc(nn.join(', '))}`);
     t.cols.filter(x => /A/.test(x[1])).forEach(x => rub.push(`UNIQUE en ${esc(t.name)}.${esc(x[0])}`)); });
   rub.push('Tablas en singular y creadas en el orden correcto'); rub.push('Sin consultas (solo CREATE TABLE)');
-  const hints = ['Orden de creación: primero las tablas a las que apuntan otras.', 'Para cada tabla: columnas con tipo → NOT NULL en lo obligatorio → PRIMARY KEY (compuesta una sola vez) → UNIQUE en alternativas → FOREIGN KEY ... REFERENCES.', `Tablas: ${sub.map(t => t.name).join(', ')}. FK obligatoria → NOT NULL; opcional → sin NOT NULL.`, 'Los tipos no son lo importante: INT, VARCHAR(n), DATE, DECIMAL(8,2).'];
-  return {id: 'ddlw:' + c.id, part: 3, title: `DDL: desde cero · ${c.name}`, src: c.from, statement: `${rulesList(c)}<p><b>Escribe el DDL</b> (solo <code>CREATE TABLE</code>, sin consultas) de estas ${sub.length} tablas. Tablas en singular y en el orden correcto.</p><pre class="code">${esc(sub.map(t => marcoLine(t, false)).join('\n'))}</pre><p class="small">Las claves y los nulos los deduces del enunciado.</p>`, hints,
-    solution: `<pre class="code">${esc(BQ_SOLUTION(c, sub))}</pre><p class="small">Los tipos pueden variar: lo que se evalúa son claves, nulos, UNIQUE y FK.</p>`, rubric: rub};
+  const hints = hard ? ['Primero decide las tablas: una por entidad, una intermedia por cada N:M / ternaria / multivalorado.', 'Después las columnas de cada una (los atributos del enunciado) y qué FKs salen de cada relación.', 'Crea primero las tablas a las que apuntan otras. FK obligatoria → NOT NULL; opcional → sin NOT NULL.', 'Claves: si el enunciado da un identificador natural (DNI, ISBN...), es la CP.']
+    : ['Orden de creación: primero las tablas a las que apuntan otras.', 'Para cada tabla: columnas con tipo → NOT NULL en lo obligatorio → PRIMARY KEY (compuesta una sola vez) → UNIQUE en alternativas → FOREIGN KEY ... REFERENCES.', `Tablas: ${sub.map(t => t.name).join(', ')}. FK obligatoria → NOT NULL; opcional → sin NOT NULL.`, 'Los tipos no son lo importante: INT, VARCHAR(n), DATE, DECIMAL(8,2).'];
+  return {id: (hard ? 'ddlh:' : 'ddlw:') + c.id, part: 3, title: `DDL: ${hard ? 'solo enunciado' : 'desde cero'} · ${c.name}`, src: c.from, statement: `${rulesList(c)}<p>Escribe el DDL (solo CREATE TABLE, sin consultas) ${hard ? 'de todo el enunciado: deduce tú las tablas, las columnas y las claves' : 'de estas ' + sub.length + ' tablas'}. Tablas en singular y en el orden correcto.</p>${hard ? '' : `<pre class="code">${esc(sub.map(t => marcoLine(t, false)).join('\n'))}</pre><p class="small">Las claves y los nulos los deduces del enunciado.</p>`}`, hints,
+    solution: `<pre class="code">${esc(sol)}</pre><p class="small">Los tipos pueden variar: lo que se evalúa son claves, nulos, UNIQUE y FK.</p>`, rubric: rub};
 }
 function dmlResult(db, sql) {
   const r = runSafe(db, sql); if (r.error) return `<div class="dres bad">❌ ${esc(r.error)}</div>`;
   return r.kind === 'select' ? resultTable(r, 8) : `<p>${esc(r.op)}: <b>${r.affected}</b> fila(s) afectada(s).</p>`;
 }
 function itemDmlR(t) {
-  const hints = ['Simula la sentencia con los datos: ¿qué devuelve o qué cambia exactamente?', 'Repasa la lista: WHERE · comillas · comas · orden de las cláusulas · NULL · paréntesis con AND/OR · ASC/DESC.', `Piensa en: «${esc(t.why[0][0])}».`, 'Escribe la corrección en el folio aunque no estés seguro del porqué.'];
+  const hints = ['Simula la sentencia con los datos: ¿qué devuelve o qué cambia exactamente?', 'Repasa la lista: WHERE · comillas · comas · orden de las cláusulas · NULL · paréntesis con AND/OR · ASC/DESC · tipos de las columnas.', `Piensa en: «${esc(t.why[0][0])}».`, 'Escribe la corrección en el folio aunque no estés seguro del porqué.'];
   const ref = [].concat(t.ref)[0];
-  return {id: 'dmlr:' + t.id, part: 4, title: `DML: revisar · ${t.title}`, src: 'Sentencia con error', statement: `<p>${esc(t.prompt)}</p>${dataViewer(t.db)}<pre class="code">${esc(t.bad)}</pre><p><b>¿Qué está mal y por qué?</b> Escribe la explicación y la sentencia corregida.</p>`, hints,
-    solution: `<p>${t.model}</p><p><b>Corrección:</b></p><pre class="code">${esc(ref)}</pre><div class="cols2"><div class="dres"><b>Lo que hace la sentencia con error</b>${dmlResult(t.db, t.bad)}</div><div class="dres"><b>Lo que debería hacer</b>${dmlResult(t.db, ref)}</div></div>`,
+  return {id: 'dmlr:' + t.id, part: 4, title: `DML: revisar · ${t.title}`, src: 'Sentencia con error', statement: `<p>${esc(t.prompt)}</p>${dataViewer(t.db)}<pre class="code">${esc(t.bad)}</pre><p>¿Qué está mal y por qué? Escribe la explicación y la sentencia corregida.</p>`, hints,
+    solution: `<p>${t.model}</p><p><b>Corrección:</b></p><pre class="code">${esc(ref)}</pre><div class="cols2"><div class="dres"><b>Lo que hace la sentencia con error</b>${dmlResult(t.db, t.bad)}</div><div class="dres"><b>Lo que debería hacer</b>${dmlResult(t.db, ref)}</div></div>${explainSql(ref)}`,
     rubric: [`Vi el error: ${esc(strip(t.model).slice(0, 120))}…`, 'Lo expliqué con la idea clave (campo libre)', 'Escribí la sentencia corregida y da el mismo resultado']};
 }
 function itemDmlW(t) {
   const refs = [].concat(t.ref), hints = [...(t.hints || [])]; if (t.skeleton) hints.push(`Plantilla:<pre class="code">${esc(t.skeleton)}</pre>`);
-  if (!hints.length) hints.push('Construye la sentencia cláusula a cláusula: SELECT → FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT.');
-  return {id: 'dmlw:' + t.id, part: 4, title: `DML: desde cero · ${t.title}`, src: t.src, statement: `<p>${esc(t.prompt)}</p>${t.aliases ? `<p class="small">La columna debe llamarse <code>${esc(t.aliases.join(', '))}</code>.</p>` : ''}${dataViewer(t.db)}<p><b>Escribe la sentencia</b> en el folio.</p>`, hints,
-    solution: `${refs.map((r, i) => `<p>${refs.length > 1 ? 'Opción ' + (i + 1) + ':' : '<b>Solución:</b>'}</p><pre class="code">${esc(r.replace(/;\s*/g, ';\n'))}</pre>`).join('')}<div class="dres"><b>Resultado esperado</b>${dmlResult(t.db, refs[0])}</div>`,
+  hints.unshift('Método: 1) ¿de qué tabla? 2) ¿qué filas (WHERE)? 3) ¿agrupo (GROUP BY / HAVING)? 4) ¿qué columnas o cálculos muestro? 5) ¿orden y LIMIT?');
+  return {id: 'dmlw:' + t.id, part: 4, title: `DML: desde cero · ${t.title}`, src: t.src, statement: `<p>${esc(t.prompt)}</p>${t.aliases ? `<p class="small">La columna debe llamarse <code>${esc(t.aliases.join(', '))}</code>.</p>` : ''}${dataViewer(t.db)}<p>Escribe la sentencia en el folio.</p>`, hints,
+    solution: `${refs.map((r, i) => `<p>${refs.length > 1 ? 'Opción ' + (i + 1) + ':' : '<b>Solución:</b>'}</p><pre class="code">${esc(r.replace(/;\s*/g, ';\n'))}</pre>`).join('')}<div class="dres"><b>Resultado esperado</b>${dmlResult(t.db, refs[0])}</div>${explainSql(refs[0])}`,
     rubric: ['Mi sentencia daría el mismo resultado (o equivalente)', 'Orden de cláusulas correcto y comillas/comas bien', ...(t.aliases ? ['Alias pedido: ' + esc(t.aliases.join(', '))] : [])]};
 }
 function itemNorm(t) { return {id: 'norm:' + t.id, part: 5, title: `Normalización · ${t.title}`, src: 'Boletín normalización', statement: `<p>${t.q}</p><p class="small">Notación DeMarco: <code>{ }</code> repetición · <code>[ ]</code> opcional · <code>( )</code> composición.</p>`, hints: t.hints, solution: t.sol, rubric: t.rub}; }
 function itemCard0() { return {id: 'card0', part: 1, title: 'Cardinalidades (boletín 0)', src: 'Boletín 0: Cardinalidades', statement: `<p>Representa las cardinalidades (par pegado a la entidad que se cuenta):</p><ol class="plist">${D.CARD0.map(x => `<li>${esc(x[0])}</li>`).join('')}</ol>`, hints: ['Pregúntate en cada frase: ¿puede existir uno SIN el otro? (mínimo) y ¿cuántos a la vez? (máximo).', 'Si la parte no existe sin el todo (vagón, ejemplar, municipio) → entidad débil.', '«Varios y varios» → N:M; si hay datos de la pareja (nota, cantidad) van en la relación.'], solution: `<ol class="plist">${D.CARD0.map(x => `<li>${x[1]}</li>`).join('')}</ol>`, rubric: D.CARD0.map((x, i) => `${i + 1}. ${esc(x[0].slice(0, 60))}`)}; }
+function itemCard1(i) { const x = D.CARD1[i]; return {id: 'card1:' + i, part: 1, title: `Relámpago pares · ${i + 1}`, src: '2 minutos', statement: `<p>${esc(x[0])}</p><p>Dibuja la relación con sus (min,max) (pegado a la entidad que se cuenta).</p>`, hints: ['¿Puede existir uno sin el otro? (mínimo 0 o 1) ¿Cuántos a la vez? (máximo 1 o N).', 'Escribe la frase al lado de cada par.'], solution: `<p>${x[1]}</p>`, rubric: ['Pares (min,max) bien colocados', 'Tipo de relación correcto', 'Detalle especial (rol / débil / aserción / ISA) si lo hay']}; }
+function itemTab0(i) { const x = D.TAB0[i]; return {id: 'tab0:' + i, part: 2, title: `Relámpago tablas · ${i + 1}`, src: '3 minutos', statement: `<p>${esc(x.q)}</p><p>Escribe las tablas resultantes con la notación de marco.</p>`, hints: x.h, solution: `<pre class="code">${esc(x.a)}</pre>`, rubric: ['Tablas y CP correctas', 'FK en el lado correcto y su nulabilidad (VNN / NULL)', 'Restricciones adicionales si las hay']}; }
 
 // ---------- listas por sección ----------
 function paperSections() {
-  const caseIds = D.CASES.filter(c => c.id !== 'huertoex').map(c => c.id), pcs = D.PCASES.map(c => c.id);
+  const withTables = ALLC().filter(c => c.tables), er = withTables.filter(c => c.id !== 'huertoex'), pcs = D.PCASES.map(c => c.id);
   return [
-    {k: 'er', t: '1 · E/R (conceptual)', ids: [...caseIds, ...pcs, 'card0'].map(i => i === 'card0' ? 'card0' : 'er:' + i)},
-    {k: 'tab', t: '2 · Paso a tablas + existencialidad', ids: [...D.CASES.map(c => c.id), ...pcs].map(i => 'tab:' + i)},
-    {k: 'ddlv', t: '3 · DDL: validar y explicar el porqué', ids: D.CASES.map(c => 'ddlv:' + c.id)},
-    {k: 'ddlw', t: '3 · DDL: escribir desde cero', ids: D.CASES.map(c => 'ddlw:' + c.id)},
+    {k: 'er', t: '1 · E/R (conceptual)', ids: [...er.map(c => 'er:' + c.id), 'card0']},
+    {k: 'quick', t: '⚡ Relámpago (2-3 minutos)', ids: [...D.CARD1.map((_, i) => 'card1:' + i), ...D.TAB0.map((_, i) => 'tab0:' + i)]},
+    {k: 'tab', t: '2 · Paso a tablas + existencialidad', ids: withTables.map(c => 'tab:' + c.id)},
+    {k: 'ddlv', t: '3 · DDL: validar y explicar el porqué', ids: [...D.CASES.map(c => 'ddlv:' + c.id), ...withTables.map(c => 'ddlg:' + c.id)]},
+    {k: 'ddlw', t: '3 · DDL: escribir desde cero', ids: [...withTables.map(c => 'ddlw:' + c.id), ...withTables.filter(c => ddlNames(c, true).length).map(c => 'ddlh:' + c.id)]},
     {k: 'dmlr', t: '3 · DML: revisar errores', ids: D.DMLR.map(t => 'dmlr:' + t.id)},
-    {k: 'dmlw', t: '3 · DML: desde cero (boletines)', ids: D.DMLW.map(t => 'dmlw:' + t.id)},
+    {k: 'dmlw', t: '3 · DML: desde cero (boletines y más)', ids: D.DMLW.map(t => 'dmlw:' + t.id)},
     {k: 'norm', t: 'Normalización (boletín)', ids: D.NORM.map(t => 'norm:' + t.id)}];
 }
-const paperTitle = id => { const it = paperItem(id); return it ? it.title.replace(/^[^·]+· /, '') : id; };
+const paperTitle = id => paperMeta(id).title.replace(/^[^·]+· /, '');
 
 // ---------- pantallas ----------
-let pp = null;
+let pp = null, pFilter = 0;       // 0 todo · 1/2/3 nivel · 9 rápidos
+const passFilter = id => { const m = paperMeta(id); return pFilter === 0 || (pFilter === 9 ? m.min <= 4 : m.level === pFilter); };
 function paperHome() {
   const secs = paperSections(), pc = save.paper || {};
   const dn = ids => ids.filter(i => pc[i] !== undefined).length;
   view(`<div class="crumb"><button class="ghost" onclick="BQA.home()">← Plan</button></div><section class="hero"><h1>✏️ Modo papel</h1>
-   <p>El examen es en papel: aquí <b>lees</b>, lo haces <b>en el folio</b>, y cuando acabes pulsas <b>✅ Corregir</b> para ver la solución y marcar lo que tenías bien. Si te atascas: <b>💡 Pista</b> (de una en una).</p>
+   <p>El examen es en papel: aquí lees, lo haces en el folio, y cuando acabes pulsas ✅ Corregir para ver la solución y marcar lo que tenías bien. Si te atascas: 💡 Pista (de una en una). Hay ejercicios 🟢 fáciles, 🟡 medios y 🔴 difíciles, rápidos y densos.</p>
    <div class="row big"><button class="primary" onclick="BQA.paperExam()">📝 Simulacro en papel (examen completo)</button></div>
    <div class="row"><button class="ghost" onclick="BQA.paperPrint('')">🖨 Imprimir un examen (enunciados)</button><button class="ghost" onclick="BQA.paperPrint('sol')">🖨 …con soluciones</button></div></section>
    ${secs.map(s => `<button class="ucard" style="width:100%" onclick="BQA.paperList('${s.k}')"><span class="uicon">✏</span><span class="uname">${esc(s.t)}</span><span class="usub">${s.ids.length} ejercicios</span><span class="ubadge">PAPEL</span><span class="upct">${dn(s.ids)}/${s.ids.length}</span></button>`).join('<div style="height:8px"></div>')}`);
 }
-function paperList(k) {
-  const s = paperSections().find(x => x.k === k), pc = save.paper || {};
-  view(`<div class="crumb"><button class="ghost" onclick="BQA.paper()">← Modo papel</button></div><section class="hero"><h1>${esc(s.t)}</h1><div class="row"><button class="primary" onclick="BQA.paperOpen('${s.k}',0)">▶ Empezar por el primero</button></div></section>
-   <div class="cases">${s.ids.map((id, i) => { const p = pc[id]; return `<div class="case"><b>${esc(paperTitle(id))}</b> ${p !== undefined ? `<span class="tag">${p}%</span>` : ''}<div class="row"><button onclick="BQA.paperOpen('${s.k}',${i})">Abrir</button></div></div>`; }).join('')}</div>`);
+function paperList(k, f) {
+  if (f !== undefined) pFilter = f;
+  const s = paperSections().find(x => x.k === k), pc = save.paper || {}, ids = s.ids.filter(passFilter);
+  const chips = [[0, 'Todos'], [1, '🟢 Fácil'], [2, '🟡 Media'], [3, '🔴 Difícil'], [9, '⚡ Rápidos (≤4 min)']].map(([v, n]) => `<button class="${pFilter === v ? 'primary' : 'ghost'}" onclick="BQA.paperList('${k}',${v})">${n}</button>`).join('');
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.paper()">← Modo papel</button></div><section class="hero"><h1>${esc(s.t)}</h1><div class="row">${chips}</div>${ids.length ? `<div class="row"><button class="primary" onclick="BQA.paperOpen('${k}',0)">▶ Empezar por el primero (${ids.length})</button></div>` : '<p>Ningún ejercicio con este filtro.</p>'}</section>
+   <div class="cases">${ids.map((id, i) => { const p = pc[id], m = paperMeta(id); return `<div class="case"><b>${esc(paperTitle(id))}</b> <span class="tag ghosttag">${lvlName(m.level)}</span> <span class="tag ghosttag">≈${m.min} min</span> ${p !== undefined ? `<span class="tag">${p}%</span>` : ''}<div class="row"><button onclick="BQA.paperOpen('${k}',${i})">Abrir</button></div></div>`; }).join('')}</div>`);
 }
 function paperOpen(k, i, ids, title) {
   const s = k ? paperSections().find(x => x.k === k) : null;
-  pp = {list: ids || s.ids, i, sec: k, title: title || (s ? s.t : ''), hint: 0, done: false, checks: new Set()}; paperShow();
+  pp = {list: ids || s.ids.filter(passFilter), i, sec: k, title: title || (s ? s.t : ''), hint: 0, done: false, checks: new Set()}; paperShow();
 }
 function paperShow() {
   const id = pp.list[pp.i], it = paperItem(id); pp.it = it; pp.hint = 0; pp.done = false; pp.checks = new Set();
   view(`<div class="crumb"><button class="ghost" onclick="${pp.sec ? `BQA.paperList('${pp.sec}')` : 'BQA.paper()'}">✕ Salir</button><span class="small">${esc(pp.title)} · ${pp.i + 1}/${pp.list.length}</span></div>
-   <section class="qcard"><div class="qhead"><span class="tag">✏ ${it.part === 5 ? 'NORMALIZACIÓN' : 'PARTE ' + it.part}</span>${it.src ? `<span class="tag ghosttag">${esc(it.src)}</span>` : ''}</div>
+   <section class="qcard"><div class="qhead"><span class="tag">✏ ${it.part === 5 ? 'NORMALIZACIÓN' : 'PARTE ' + it.part}</span><span class="tag ghosttag">${lvlName(it.level)} · ≈${it.min} min</span>${it.src ? `<span class="tag ghosttag">${esc(it.src)}</span>` : ''}</div>
    <h2>${it.title}</h2><div class="statement">${it.statement}</div>
+   ${it.chuleta ? `<details class="rules"><summary>📋 Chuleta rápida (si la necesitas)</summary>${it.chuleta}</details>` : ''}
    <p class="small">✏ Hazlo en el folio. 💡 Si te atascas, pide una pista. Cuando acabes, ✅ Corregir.</p>
    <div class="row big"><button class="ghost" id="pHint" onclick="BQA.paperHint()">💡 Pista (0/${it.hints.length})</button><button class="primary" id="pCorr" onclick="BQA.paperCorrect()">✅ Corregir</button></div>
    <div id="pHints"></div><div id="pSol"></div></section>`);
@@ -3034,7 +3448,7 @@ function paperAll() { document.querySelectorAll('.rub input').forEach((b, i) => 
 function paperNext() {
   const it = pp.it, pct = Math.round(pp.checks.size / it.rubric.length * 100);
   save.paper = save.paper || {}; save.paper[it.id] = pct; pp.scores = pp.scores || {}; pp.scores[it.id] = pct;
-  const gain = Math.round(pct / 5); save.xp += gain; persist();
+  save.xp += Math.round(pct / 5); persist();
   if (pp.i + 1 < pp.list.length) { pp.i++; paperShow(); return; }
   const sc = Object.values(pp.scores), avg = Math.round(sc.reduce((a, b) => a + b, 0) / sc.length);
   const byPart = {}; pp.list.forEach(id => { const p = paperItem(id).part; (byPart[p] = byPart[p] || []).push(pp.scores[id] ?? 0); });
@@ -3042,15 +3456,13 @@ function paperNext() {
    <div class="parts">${Object.keys(byPart).map(p => { const v = Math.round(byPart[p].reduce((a, b) => a + b, 0) / byPart[p].length); return `<div class="part"><b>${p == 5 ? 'Norm.' : 'Parte ' + p}</b><strong>${v}%</strong><i style="width:${v}%"></i></div>`; }).join('')}</div>
    <p class="small">Tu nota de cada ejercicio queda guardada en el listado.</p><div class="row big"><button class="primary" onclick="BQA.paper()">Modo papel</button><button onclick="BQA.home()">Plan</button></div></section>`);
 }
+function examIds(c) { return [`er:${c.id}`, `tab:${c.id}`, `ddlv:${c.id}`, `ddlw:${c.id}`, ...shuffle(D.DMLR).slice(0, 5).map(t => 'dmlr:' + t.id), 'dmlw:' + pick(D.DMLW).id]; }
 function paperExam(caseId) {
   const pool = D.CASES.filter(c => c.id !== 'huertoex'), c = caseId ? caseAny(caseId) : pick(pool);
-  const ids = [`er:${c.id}`, `tab:${c.id}`, `ddlv:${c.id}`, `ddlw:${c.id}`, ...shuffle(D.DMLR).slice(0, 5).map(t => 'dmlr:' + t.id), 'dmlw:' + pick(D.DMLW).id];
-  paperOpen(null, 0, ids, `Simulacro en papel · ${c.name}`);
+  paperOpen(null, 0, examIds(c), `Simulacro en papel · ${c.name}`);
 }
 function paperPrint(mode) {
-  const pool = D.CASES.filter(c => c.id !== 'huertoex'), c = pick(pool);
-  const ids = [`er:${c.id}`, `tab:${c.id}`, `ddlv:${c.id}`, `ddlw:${c.id}`, ...shuffle(D.DMLR).slice(0, 5).map(t => 'dmlr:' + t.id), 'dmlw:' + pick(D.DMLW).id];
-  const its = ids.map(paperItem);
+  const pool = D.CASES.filter(c => c.id !== 'huertoex'), c = pick(pool), its = examIds(c).map(paperItem);
   view(`<div class="crumb"><button class="ghost" onclick="BQA.paper()">← Modo papel</button><button class="primary" onclick="window.print()">🖨 Imprimir / guardar PDF</button><button class="ghost" onclick="BQA.paperPrint('${mode}')">Otro examen</button></div>
    <section class="block printsheet"><h3>Examen de práctica · ${esc(c.name)}</h3><p class="small">Parte 1: E/R · Parte 2: paso a tablas · Parte 3: DDL y DML. Convención de clase: (min,max) pegado a la entidad que se cuenta.</p>${its.map((it, n) => `<div class="pitem"><h4>${n + 1}. ${it.title}</h4><div class="statement">${it.statement}</div>${mode === 'sol' ? `<div class="psol"><b>Solución</b>${it.solution}</div>` : '<div class="lines"></div>'}</div>`).join('')}</section>`);
 }
@@ -3212,7 +3624,7 @@ function practice(kind){
 
 // ---------- pintar cada tarea ----------
 let st = {}; // estado de la pregunta actual
-function rulesBox(c, open){ if(open && run && run.i>0 && run.list[run.i-1] && run.list[run.i-1].cs===c) open=false; return `<details class="rules" ${open?'open':''}><summary>📄 Enunciado: ${esc(c.name)} (toca para ${open?'ocultar':'ver'})</summary><ol>${c.rules.map(r=>`<li>${r}</li>`).join('')}</ol></details>`; }
+function rulesBox(c, open){ if(open && run && run.i>0 && run.list[run.i-1] && run.list[run.i-1].cs===c) open=false; return `<details class="rules" ${open?'open':''}><summary>📄 Enunciado: ${esc(c.name)} (toca para ${open?'ocultar':'ver'})</summary><ol>${c.rules.map(r=>`<li>${String(r).replace(/<\/?b>/g,'')}</li>`).join('')}</ol></details>`; }
 function task(){
   const q = run.list[run.i]; st = {q, answered:false};
   const u = unitById(q.topic);
