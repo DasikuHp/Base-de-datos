@@ -16,7 +16,7 @@
 
 La web del profe **no es coherente**:
 
-- **Los dibujos** ponen el par pegado a la entidad que se cuenta. *Departamento —(1,1)— tiene —(1,N)— Empleado* significa que un departamento tiene de 1 a N empleados y que cada empleado tiene exactamente 1 departamento.
+- **Lectura (web, conceptual 4.4)**: el par pegado a una entidad se lee desde esa entidad hacia la relación. *Cliente (0,N) —realiza— Pedido (1,1)* = un cliente puede estar en 0 a N pedidos y cada pedido es de exactamente 1 cliente. Solo el apartado de lógico (4.1/4.2) los escribe al revés.
 - **Algunos textos** lo escriben al revés.
 
 **En el examen escribe la frase al lado de cada par** ("cada pedido tiene exactamente 1 cliente"). Así está bien lo lea como lo lea. Y para el `VNN` de una FK no mires números: pregúntate **"¿puede existir un PEDIDO sin CLIENTE?"**
@@ -208,9 +208,9 @@ Datos: `SOCIO` tiene los num_socio 1, 2 y 3. `PRESTAMO` tiene una fila del socio
 
 **Ronda 1**
 
-1. Libro **(1,N)** — escrito por — **(1,N)** Autor. Junto a Autor, (1,N): un libro tiene uno o varios autores. Junto a Libro, (1,N): de cada autor hay al menos un libro. Tipo **N:M**.
+1. Libro **(1,N)** — escrito por — **(1,N)** Autor. Junto a Libro, (1,N): un libro tiene uno o varios autores. Junto a Autor, (1,N): de cada autor hay al menos un libro. Tipo **N:M**.
 2. **Entidad débil**: no se identifica sola. Identificador = ISBN del libro + **clave parcial** `num_ejemplar` (el 1 de un libro no es el 1 de otro). Se dibuja con **doble rectángulo**, relación identificadora con **doble rombo**, `num_ejemplar` con **subrayado discontinuo** y participación total.
-3. Libro **(1,1)** — tiene — **(1,N)** Ejemplar. Cada ejemplar es de exactamente un libro; cada libro tiene varios ejemplares (al menos uno).
+3. Libro **(1,N)** — tiene — **(1,1)** Ejemplar. Cada libro tiene varios ejemplares (al menos uno); cada ejemplar es de exactamente un libro.
 4. **N:M** entre Socio y Ejemplar, con atributos **fecha** y **fecha_devolucion**. Ojo: el mismo socio puede llevarse el mismo ejemplar varias veces, así que la fecha tiene que ayudar a identificar cada préstamo (pregunta 9).
 5. El **DNI** del socio: es candidato, pero el identificador es el número de socio. Se queda como **C.Alt(dni)** y, como todos lo tienen, **VNN(dni)**.
 
