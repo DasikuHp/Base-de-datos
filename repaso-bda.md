@@ -16,7 +16,7 @@
 
 La web del profe **no es coherente**:
 
-- **Los dibujos** ponen el par pegado a la entidad que se cuenta. *Departamento —(1,1)— tiene —(1,N)— Empleado* significa que un departamento tiene de 1 a N empleados y que cada empleado tiene exactamente 1 departamento.
+- **Los dibujos** ponen el par pegado a la entidad que se cuenta. *Departamento —(1,1)— tiene —(1,N)— Empleado* significa que un departamento tiene de 1 a N empleados y que cada empleado tiene exactamente 1 departamento. (Convención de clase. Solo el párrafo «Lectura correcta» de conceptual 4.4 lo escribe al revés.)
 - **Algunos textos** lo escriben al revés.
 
 **En el examen escribe la frase al lado de cada par** ("cada pedido tiene exactamente 1 cliente"). Así está bien lo lea como lo lea. Y para el `VNN` de una FK no mires números: pregúntate **"¿puede existir un PEDIDO sin CLIENTE?"**
