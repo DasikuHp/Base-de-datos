@@ -66,7 +66,7 @@ function home(){
    <div class="bar" style="width:100%;margin:6px 0"><i style="width:${pct}%"></i></div><p class="small">${done} de ${PLAN.length} pasos hechos</p>
    ${cur ? `<div class="stepnow"><span class="uicon">${cur.i}</span><div><b>Paso ${n+1}: ${esc(cur.t)}</b><br><span class="small">≈ ${cur.m} min · una cosa cada vez</span></div></div>
    <div class="row big"><button class="primary" onclick="BQA.planGo(${n})">▶ Empezar este paso</button><button class="ghost" onclick="BQA.planSkip(${n})">Saltar</button></div>` : `<h2>🏆 ¡Plan completado!</h2><div class="row big"><button class="primary" onclick="BQA.exam()">📝 Otro simulacro</button><button onclick="BQA.review()">♻ Repasar fallos</button></div>`}
-   <div class="row"><button class="primary" onclick="BQA.taller()">🧱 Aprender CREATE TABLE desde cero</button><button class="primary" onclick="BQA.paper()">✏️ Modo papel (resuelvo en folio)</button></div><div class="row"><button class="ghost" id="tmBtn" onclick="BQA.pomo()">⏱ 25</button><span class="small">Temporizador de 25 min: cuando suene, 5 min de descanso.</span></div></section>
+   <div class="stepnow" style="margin-top:12px"><span class="uicon">🧪</span><div><b>Lo que te queda: DML</b><br><span class="small">Repaso express de todo + diagnóstico + lo que entra en el examen</span></div></div><div class="row big"><button class="primary" onclick="BQA.dml()">🧪 Taller de DML</button><button onclick="BQA.dmlExam()">🎯 Simulacro DML</button></div><div class="row"><button class="primary" onclick="BQA.taller()">🧱 Repasar CREATE TABLE</button><button class="primary" onclick="BQA.paper()">✏️ Modo papel (resuelvo en folio)</button></div><div class="row"><button class="ghost" id="tmBtn" onclick="BQA.pomo()">⏱ 25</button><span class="small">Temporizador de 25 min: cuando suene, 5 min de descanso.</span></div></section>
    <ol class="plan">${PLAN.map((p,k)=>`<li class="${save.plan[k]?'dn':k===n?'now':''}"><button onclick="BQA.planGo(${k})"><span>${save.plan[k]?'✔':p.i}</span> ${esc(p.t)} <small>${p.m} min</small></button></li>`).join('')}</ol>
    <details class="rules"><summary>Más opciones (todos los casos, temas, rondas)</summary><div id="moreBox"></div></details>`);
   $('moreBox').innerHTML = homeFull(); pomoTick(); hud();
@@ -356,7 +356,7 @@ function reset(){ if(confirm('¿Borrar todo el progreso y los fallos guardados?'
 
 // ---------- API para los botones ----------
 window.BQA = {
-  taller:tallerHome, tallerOpen, tallerHint, tallerSol, tallerCheck, tallerDiag, tallerDiagCheck, paper:paperHome, paperRoute, paperRouteGo, paperList, paperOpen, paperHint, paperCorrect, paperTick, paperAll, paperNext, paperExam, paperPrint,
+  dml:dmlTallerHome, dmlOpen, dmlHint2, dmlSol, dmlCheck, dmlDiag, dmlDiagCheck, dmlExam, taller:tallerHome, tallerOpen, tallerHint, tallerSol, tallerCheck, tallerDiag, tallerDiagCheck, paper:paperHome, paperRoute, paperRouteGo, paperList, paperOpen, paperHint, paperCorrect, paperTick, paperAll, paperNext, paperExam, paperPrint,
   home, planGo, pomo:pomoToggle, planSkip(i){ save.plan[i]=true; persist(); home(); }, unit:unitView, campaign, review, exam, casePart, cheats, progress, reset, check, selfOk,
   quit(){ if(!run || confirm('¿Salir? Lo contestado ya cuenta para el progreso.')) home(); },
   opt(i){ if(st.answered) return; if(st.q.type==='multi'){ st.sel.has(i)?st.sel.delete(i):st.sel.add(i); } else { st.sel = new Set([i]); }
