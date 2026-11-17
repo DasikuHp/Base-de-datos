@@ -22,8 +22,8 @@ BQ.CASES = [
   'R4. De cada <b>taller</b> se guarda un número interno, el equipo necesario y la fecha en que se celebra. Cada taller lo imparte <b>exactamente un</b> monitor; un monitor puede impartir varios talleres o ninguno todavía.',
   'R5. Los vecinos <b>se apuntan</b> a talleres y se guarda la <b>fecha de alta</b>. Un vecino puede no apuntarse a ninguno y un taller puede no tener apuntados.'],
  rels:[
-  {a:'Vecino', verb:'tiene', b:'Parcela', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R2: cada parcela tiene exactamente 1 vecino → (1,1) junto a Parcela. Un vecino puede tener 0 o varias parcelas → (0,N) junto a Vecino.'},
-  {a:'Monitor', verb:'imparte', b:'Taller', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R4: "exactamente un monitor" por taller → (1,1) junto a Taller. "Varios o ninguno todavía" → (0,N) junto a Monitor.'},
+  {a:'Vecino', verb:'tiene', b:'Parcela', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R2: cada parcela tiene exactamente 1 vecino → (1,1) junto a Vecino. Un vecino puede tener 0 o varias parcelas → (0,N) junto a Parcela.'},
+  {a:'Monitor', verb:'imparte', b:'Taller', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R4: "exactamente un monitor" por taller → (1,1) junto a Monitor. "Varios o ninguno todavía" → (0,N) junto a Taller.'},
   {a:'Vecino', verb:'se apunta', b:'Taller', na:['0','N'], nb:['0','N'], tipo:'N:M', attr:'fecha_alta', why:'R5: un taller puede tener 0 o muchos vecinos y un vecino 0 o muchos talleres → N:M con el atributo fecha_alta en la relación.'}],
  tables:[
   {name:'VECINO', cols:[['dni_vecino','P'],['nombre','V'],['apellido1','V'],['apellido2','o']]},
@@ -88,9 +88,9 @@ CREATE TABLE se_apunta (
   'R5. De cada <b>maillot</b>: código (lo identifica), tipo, color y premio.',
   'R6. En cada etapa, <b>cada maillot lo lleva un único ciclista</b>. Un ciclista puede llevar varios maillots en varias etapas.'],
  rels:[
-  {a:'Equipo', verb:'tiene', b:'Ciclista', na:['1','N'], nb:['1','1'], tipo:'1:N', why:'R2: cada ciclista está en exactamente 1 equipo → (1,1) junto a Ciclista. Un equipo tiene "al menos un" ciclista → (1,N) junto a Equipo.'},
-  {a:'Ciclista', verb:'gana', b:'Etapa', na:['0','N'], nb:['0','1'], tipo:'1:N', why:'R3: una etapa tiene "como mucho un" ganador y puede no tenerlo → (0,1) junto a Etapa. Un ciclista gana 0 o varias → (0,N) junto a Ciclista.'},
-  {a:'Etapa', verb:'tiene', b:'Puerto', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R4: cada puerto está en "exactamente una" etapa → (1,1) junto a Puerto. Una etapa tiene 0 o varios puertos → (0,N) junto a Etapa.'}],
+  {a:'Equipo', verb:'tiene', b:'Ciclista', na:['1','1'], nb:['1','N'], tipo:'1:N', why:'R2: cada ciclista está en exactamente 1 equipo → (1,1) junto a Equipo. Un equipo tiene "al menos un" ciclista → (1,N) junto a Ciclista.'},
+  {a:'Ciclista', verb:'gana', b:'Etapa', na:['0','1'], nb:['0','N'], tipo:'1:N', why:'R3: una etapa tiene "como mucho un" ganador y puede no tenerlo → (0,1) junto a Ciclista. Un ciclista gana 0 o varias → (0,N) junto a Etapa.'},
+  {a:'Etapa', verb:'tiene', b:'Puerto', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R4: cada puerto está en "exactamente una" etapa → (1,1) junto a Etapa. Una etapa tiene 0 o varios puertos → (0,N) junto a Puerto.'}],
  tables:[
   {name:'EQUIPO', cols:[['nomeq','P'],['director','o']], note:'ASERCIÓN: EQUIPO[nomeq] ⊆ CICLISTA[nomeq] (todo equipo tiene al menos un ciclista: no sale con FK).'},
   {name:'CICLISTA', cols:[['dorsal','P'],['nombre','V'],['edad','o'],['nomeq','V','EQUIPO']]},
@@ -162,9 +162,9 @@ CREATE TABLE llevar (
   'R4. De cada <b>consulta</b> se guarda fecha y hora (obligatoria), diagnóstico y tratamiento. Cada consulta la atiende <b>UN</b> doctor, en <b>UNA</b> sala, para <b>UN</b> paciente: solo tiene sentido con los tres.',
   'R5. Un paciente puede tener muchas consultas o <b>ninguna aún</b>. Un doctor atiende muchas consultas y <b>todos los doctores</b> están dando consultas. Una sala se usa en muchas consultas.'],
  rels:[
-  {a:'Paciente', verb:'tiene', b:'Consulta', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'Cada consulta es de UN paciente → (1,1) junto a Consulta. Un paciente puede no tener consultas aún → (0,N) junto a Paciente.'},
-  {a:'Doctor', verb:'atiende', b:'Consulta', na:['1','N'], nb:['1','1'], tipo:'1:N', why:'Cada consulta la atiende UN doctor → (1,1) junto a Consulta. "Todos los doctores están dando consultas" → al menos 1 → (1,N) junto a Doctor.'},
-  {a:'Sala', verb:'acoge', b:'Consulta', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'Cada consulta es en UNA sala → (1,1) junto a Consulta. El enunciado no obliga a que todas las salas se usen → (0,N) junto a Sala.'}],
+  {a:'Paciente', verb:'tiene', b:'Consulta', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'Cada consulta es de UN paciente → (1,1) junto a Paciente. Un paciente puede no tener consultas aún → (0,N) junto a Consulta.'},
+  {a:'Doctor', verb:'atiende', b:'Consulta', na:['1','1'], nb:['1','N'], tipo:'1:N', why:'Cada consulta la atiende UN doctor → (1,1) junto a Doctor. "Todos los doctores están dando consultas" → al menos 1 → (1,N) junto a Consulta.'},
+  {a:'Sala', verb:'acoge', b:'Consulta', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'Cada consulta es en UNA sala → (1,1) junto a Sala. El enunciado no obliga a que todas las salas se usen → (0,N).'}],
  tables:[
   {name:'PACIENTE', cols:[['nss','P'],['nombre','V'],['fecha_nac',''],['telefono',''],['email',''],['grupo_sang','']]},
   {name:'DOCTOR', cols:[['num_colegiado','P'],['nombre','V'],['especialidad','V'],['telefono','']], note:'ASERCIÓN: DOCTOR[num_colegiado] ⊆ CONSULTA[num_colegiado] ("todos los doctores están dando consultas").'},
@@ -221,9 +221,9 @@ CREATE TABLE consulta (
   'R4. De cada <b>pedido</b>: número (identificador), fecha, estado ("pendiente", "enviado", "entregado", "cancelado"), importe total y la dirección de envío. Cada pedido pertenece a <b>un único cliente</b> (obligatorio); un cliente puede tener varios pedidos o ninguno si acaba de registrarse.',
   'R5. Un pedido contiene <b>al menos un</b> producto. De cada producto del pedido se guarda la <b>cantidad</b> y el <b>precio unitario en el momento de la compra</b>. Un producto puede aparecer en muchos pedidos.'],
  rels:[
-  {a:'Cliente', verb:'realiza', b:'Pedido', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R4: cada pedido es de un único cliente, obligatorio → (1,1) junto a Pedido. Un cliente recién registrado puede no tener pedidos → (0,N) junto a Cliente.'},
-  {a:'Pedido', verb:'contiene', b:'Producto', na:['1','N'], nb:['0','N'], tipo:'N:M', attr:'cantidad, precio_ud', why:'R5: un pedido contiene al menos un producto → (1,N) junto a Pedido. Un producto puede estar en muchos pedidos o en ninguno → (0,N) junto a Producto. Atributos de la relación: cantidad y precio del momento.'},
-  {a:'Cliente', verb:'guarda', b:'Dirección', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R2: cada dirección es de un único cliente → (1,1) junto a Dirección. Un cliente tiene 0 o varias → (0,N) junto a Cliente.'}],
+  {a:'Cliente', verb:'realiza', b:'Pedido', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R4: cada pedido es de un único cliente, obligatorio → (1,1) junto a Cliente. Un cliente recién registrado puede no tener pedidos → (0,N) junto a Pedido.'},
+  {a:'Pedido', verb:'contiene', b:'Producto', na:['0','N'], nb:['1','N'], tipo:'N:M', attr:'cantidad, precio_ud', why:'R5: un pedido contiene al menos un producto → (1,N) junto a Producto. Un producto puede estar en muchos pedidos o en ninguno → (0,N) junto a Pedido. Atributos de la relación: cantidad y precio del momento.'},
+  {a:'Cliente', verb:'guarda', b:'Dirección', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R2: cada dirección es de un único cliente → (1,1) junto a Cliente. Un cliente tiene 0 o varias → (0,N) junto a Dirección.'}],
  tables:[
   {name:'CLIENTE', cols:[['dni','P'],['nombre','V'],['apellidos','V'],['email','AV']], note:'El email "no puede repetirse" y es obligatorio → C.Alt(email) + VNN(email).'},
   {name:'DIRECCION', cols:[['id','P'],['calle',''],['numero',''],['cp',''],['ciudad',''],['dni','V','CLIENTE']]},
@@ -292,9 +292,9 @@ CREATE TABLE linea (
   'R6. De cada <b>mecánico</b>: nombre, DNI (no se repite), especialidad y sueldo. Cada reparación la dirige <b>exactamente un</b> mecánico; un mecánico puede no dirigir ninguna.',
   'R7. Cada reparación tiene un número de orden (único) y también un identificador interno numérico.'],
  rels:[
-  {a:'Cliente', verb:'posee', b:'Vehículo', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R2: un vehículo pertenece siempre a un único cliente → (1,1) junto a Vehículo. Un cliente puede tener varios (o ninguno) → (0,N) junto a Cliente.'},
-  {a:'Vehículo', verb:'sobre', b:'Reparación', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R3: toda reparación es sobre un único vehículo → (1,1) junto a Reparación. Un vehículo puede tener muchas reparaciones o ninguna → (0,N) junto a Vehículo.'},
-  {a:'Mecánico', verb:'dirige', b:'Reparación', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R6: exactamente un mecánico por reparación → (1,1) junto a Reparación. Un mecánico puede no dirigir ninguna → (0,N) junto a Mecánico.'},
+  {a:'Cliente', verb:'posee', b:'Vehículo', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R2: un vehículo pertenece siempre a un único cliente → (1,1) junto a Cliente. Un cliente puede tener varios (o ninguno) → (0,N) junto a Vehículo.'},
+  {a:'Vehículo', verb:'sobre', b:'Reparación', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R3: toda reparación es sobre un único vehículo → (1,1) junto a Vehículo. Un vehículo puede tener muchas reparaciones o ninguna → (0,N) junto a Reparación.'},
+  {a:'Mecánico', verb:'dirige', b:'Reparación', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R6: exactamente un mecánico por reparación → (1,1) junto a Mecánico. Un mecánico puede no dirigir ninguna → (0,N) junto a Reparación.'},
   {a:'Reparación', verb:'utiliza', b:'Pieza', na:['0','N'], nb:['0','N'], tipo:'N:M', attr:'unidades', why:'R5: las dos pueden ser 0 y repetirse → (0,N) en ambos lados, N:M con el atributo unidades.'}],
  tables:[
   {name:'CLIENTE', cols:[['id','P'],['nif','AV'],['nombre',''],['telefono',''],['fecha_alta','']]},

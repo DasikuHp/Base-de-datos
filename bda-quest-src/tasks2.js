@@ -108,7 +108,7 @@ function renderCard(q) {
     <p class="hint">Atributo propio de la relación: <input id="attr" placeholder="nombre del atributo"></p>`;
   }
   const refl = !!r.roles;
-  return `${rulesBox(c, true)}<p class="hint">Pon el (min,max) <b>junto a cada entidad</b>. Se lee desde esa entidad: el par dice con cuántas de <b>la otra</b> se relaciona <b>una</b> de esta (Cliente (0,N): un cliente tiene de 0 a N pedidos).${refl ? ' Es una relación <b>reflexiva</b>: escribe también el <b>rol</b> de cada extremo; el par va junto al rol («un empleado tiene (0,1) supervisor»).' : ''}</p>
+  return `${rulesBox(c, true)}<p class="hint">Pon el (min,max) <b>junto a cada entidad</b>, como en los dibujos del profe: el par pegado a una entidad dice cuántas de <b>esa</b> le corresponden a <b>una</b> de la otra.${refl ? ' Es una relación <b>reflexiva</b>: escribe también el <b>rol</b> de cada extremo.' : ''}</p>
   <div class="erline"><span class="ent">${esc(r.a)}</span>${refl ? '<input id="rola" class="rolin" placeholder="rol…">' : ''}<span class="pair">(${selOf('amin', ['0', '1'])},${selOf('amax', ['1', 'N'])})</span><span class="line"></span><span class="rombo">${esc(r.verb)}</span><span class="line"></span><span class="pair">(${selOf('bmin', ['0', '1'])},${selOf('bmax', ['1', 'N'])})</span>${refl ? '<input id="rolb" class="rolin" placeholder="rol…">' : ''}<span class="ent">${esc(r.b)}</span></div>
   <p class="hint">Tipo de relación: ${selOf('tipo', ['1:1', '1:N', 'N:M'])}${r.attr ? ' · Atributo propio de la relación: <input id="attr" placeholder="nombre del atributo">' : ''}</p>`;
 }

@@ -51,11 +51,11 @@ C.push(
    opts:[['Entidad Etiqueta y relación N:M (0,N)–(0,N) con Película',true,'Las etiquetas se reutilizan y tienen identidad propia: entidad + N:M.'],['Atributo multivalorado "etiquetas" en Película',false,'Valdría solo si fueran datos sueltos sin reutilizar; aquí son un catálogo compartido.'],['Relación 1:N Película → Etiqueta',false,'Una misma etiqueta (p. ej. "animación") sirve para muchas películas: es N:M.']],
    truco:'"Varios y varios" → N:M. Si lo compartido tiene nombre propio, es entidad.'}],
  rels:[
-  {a:'Asistente', verb:'compra', b:'Entrada', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R6: cada entrada la adquiere un único asistente → (1,1) junto a Entrada. Un asistente puede comprar varias o ninguna → (0,N) junto a Asistente.'},
-  {a:'Proyección', verb:'tiene', b:'Entrada', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R6: cada entrada es para UNA proyección → (1,1) junto a Entrada. Una proyección puede tener muchas entradas (o ninguna aún) → (0,N) junto a Proyección.'},
-  {a:'Película', verb:'se proyecta', b:'Proyección', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R5: toda proyección vincula una película → (1,1) junto a Proyección. Una película puede proyectarse varias veces o ninguna → (0,N) junto a Película.'},
-  {a:'Sala', verb:'acoge', b:'Proyección', na:['0','N'], nb:['1','1'], tipo:'1:N', why:'R5: toda proyección tiene una sala → (1,1) junto a Proyección. Una sala acoge varias proyecciones o ninguna → (0,N) junto a Sala.'},
-  {a:'Director', verb:'dirige', b:'Película', na:['1','N'], nb:['1','1'], tipo:'1:N', alts:[{na:['0','N'], nb:['1','1'], why:'Lectura válida: el enunciado solo dice que un director "ha dirigido varias"; si no obliga a que todo director tenga película, el mínimo es 0. Con (1,N) harías falta una aserción.'}], why:'R3: cada película tiene UN director → (1,1) junto a Película. "Un director ha dirigido varias películas" → (1,N) junto a Director (admito también (0,N) si lo lees como opcional).'},
+  {a:'Asistente', verb:'compra', b:'Entrada', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R6: cada entrada la adquiere un único asistente → (1,1) junto a Asistente. Un asistente puede comprar varias o ninguna → (0,N) junto a Entrada.'},
+  {a:'Proyección', verb:'tiene', b:'Entrada', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R6: cada entrada es para UNA proyección → (1,1) junto a Proyección. Una proyección puede tener muchas entradas (o ninguna aún) → (0,N) junto a Entrada.'},
+  {a:'Película', verb:'se proyecta', b:'Proyección', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R5: toda proyección vincula una película → (1,1) junto a Película. Una película puede proyectarse varias veces o ninguna → (0,N) junto a Proyección.'},
+  {a:'Sala', verb:'acoge', b:'Proyección', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R5: toda proyección tiene una sala → (1,1) junto a Sala. Una sala acoge varias proyecciones o ninguna → (0,N) junto a Proyección.'},
+  {a:'Director', verb:'dirige', b:'Película', na:['1','1'], nb:['1','N'], tipo:'1:N', alts:[{na:['1','1'], nb:['0','N'], why:'Lectura válida: el enunciado solo dice que un director "ha dirigido varias"; si no obliga a que todo director tenga película, el mínimo es 0. Con (1,N) harías falta una aserción.'}], why:'R3: cada película tiene UN director → (1,1) junto a Director. "Un director ha dirigido varias películas" → (1,N) junto a Película (admito también (0,N) si lo lees como opcional).'},
   {a:'Película', verb:'tiene', b:'Etiqueta', na:['0','N'], nb:['0','N'], tipo:'N:M', why:'R2: una película puede tener varias etiquetas o ninguna → (0,N); una etiqueta puede estar en muchas películas → (0,N). N:M.'},
   {a:'Película', verb:'es secuela de', b:'Película', roles:{a:'original', b:'secuela'}, na:['0','1'], nb:['0','N'], tipo:'1:N', why:'Reflexiva. Junto al rol "original": una secuela tiene como mucho UNA película original y puede no tener ninguna → (0,1). Junto al rol "secuela": una película puede tener varias secuelas o ninguna → (0,N).'}],
  asserts:[],
@@ -158,7 +158,7 @@ CREATE TABLE entrada (
    opts:[['Una tabla con las 3 FKs y CP compuesta por las tres; horas va en esa tabla',true,'Las tres son N y un trabajador puede repetir rol/proyecto con otro rol: la CP es (proyecto, trabajador, rol).'],['Dos tablas N:M encadenadas',false,'Se pierde la combinación de los tres.'],['horas en la tabla TRABAJADOR',false,'Las horas dependen de los tres a la vez.']],
    truco:'Ternaria = tabla intermedia con 3 FKs y CP compuesta por las 3 (si los tres máximos son N).'}],
  rels:[
-  {a:'Empresa', verb:'encarga', b:'Proyecto', na:['1','N'], nb:['1','1'], tipo:'1:N', why:'R2: cada proyecto lo encarga UNA empresa → (1,1) junto a Proyecto. "A todas las empresas les hemos hecho al menos un proyecto" → (1,N) junto a Empresa.'},
+  {a:'Empresa', verb:'encarga', b:'Proyecto', na:['1','1'], nb:['1','N'], tipo:'1:N', why:'R2: cada proyecto lo encarga UNA empresa → (1,1) junto a Empresa. "A todas las empresas les hemos hecho al menos un proyecto" → (1,N) junto a Proyecto.'},
   {verb:'participa', ternary:[{e:'Proyecto', m:['0','N']},{e:'Trabajador', m:['1','N']},{e:'Rol', m:['0','N']}], attr:'horas', tipo:'N:M:N', why:'R3: todos los trabajadores han participado en algún proyecto → Trabajador (1,N). R2/R5: un proyecto puede no tener todavía participantes → Proyecto (0,N). R4: hay roles que nadie ha desempeñado → Rol (0,N). Atributo de la relación: horas.'}],
  asserts:[{t:'EMPRESA[codigo_empresa] ⊆ PROYECTO[codigo_empresa]', why:'R2: "a todas las empresas les hemos realizado al menos un proyecto" → mínimo 1: toda empresa aparece en PROYECTO.'},{t:'TRABAJADOR[codigo_trabajador] ⊆ PARTICIPA[codigo_trabajador]', why:'R3: "todos los trabajadores han participado en algún proyecto" → Trabajador (1,N) en la ternaria: todo trabajador aparece en PARTICIPA.'}],
  tables:[
@@ -230,7 +230,7 @@ CREATE TABLE participa (
    opts:[['Una FK auto-referenciada en EMPLEADO (dni_jefe → EMPLEADO) que admite NULL',true,'1:N reflexiva: FK en el lado N (el subordinado) apuntando a la propia tabla; min=0 → admite NULL (el director general no tiene jefe).'],['Una tabla intermedia SUPERVISA con dos FKs',false,'Solo haría falta si fuera N:M o tuviera atributos propios.'],['La FK dni_jefe como NOT NULL',false,'Con NOT NULL el director general no podría existir.']],
    truco:'Reflexiva 1:N = FK a sí misma; min 0 → NULL.'}],
  rels:[
-  {a:'Departamento', verb:'tiene', b:'Empleado', na:['1','N'], nb:['1','1'], tipo:'1:N', why:'R2: todo empleado trabaja en UN departamento → (1,1) junto a Empleado. "Todo departamento tiene al menos un empleado" → (1,N) junto a Departamento.'},
+  {a:'Departamento', verb:'tiene', b:'Empleado', na:['1','1'], nb:['1','N'], tipo:'1:N', why:'R2: todo empleado trabaja en UN departamento → (1,1) junto a Departamento. "Todo departamento tiene al menos un empleado" → (1,N) junto a Empleado.'},
   {a:'Empleado', verb:'supervisa', b:'Empleado', roles:{a:'supervisor', b:'subordinado'}, na:['0','1'], nb:['0','N'], tipo:'1:N', why:'R3: junto al rol "supervisor": un subordinado tiene como mucho UN supervisor y puede no tener ninguno (el director general) → (0,1). Junto a "subordinado": un supervisor puede supervisar varios o ninguno → (0,N).'}],
  asserts:[{t:'DEPARTAMENTO[codigo_depto] ⊆ EMPLEADO[codigo_depto]', why:'R2: "todo departamento tiene al menos un empleado" → mínimo 1: todo departamento aparece en EMPLEADO.'}],
  tables:[
@@ -270,8 +270,7 @@ CREATE TABLE telefono_empleado (
   'El diagrama es el del examen. <b>Atributos con línea discontinua = opcionales</b> (apellido2 de vecino y monitor, orientación); el resto son obligatorios.',
   'R1. <b>Vecino</b>: dni_vecino (identificador) y nombre compuesto (nombre, apellido1, apellido2). <b>Monitor</b>: dni_monitor y nombre compuesto (nombre, apellido1, apellido2).',
   'R2. <b>Taller</b>: id_taller y cupo. <b>Parcela</b>: id_parcela, metros y orientación.',
-  'R3. <b>Se apunta a</b>: Vecino (0,n) – Taller (0,n), con atributo fecha_alta. <b>Imparte</b>: Taller (1,n) – Monitor (1,1), con atributo fecha_celebración. <b>Cultiva</b>: Vecino (0,1) – Parcela (1,n).',
-  'R4. <b>Cómo se lee</b> (web, conceptual 4.4): el par pegado a una entidad dice con cuántas instancias de <b>la otra</b> se relaciona <b>una</b> de esta. Monitor (1,1) → cada monitor imparte exactamente 1 taller. Taller (1,n) → cada taller tiene de 1 a n monitores.'],
+  'R3. <b>Se apunta a</b>: Vecino (0,n) – Taller (0,n), con atributo fecha_alta. <b>Imparte</b>: Taller (1,n) – Monitor (1,1), con atributo fecha_celebración. <b>Cultiva</b>: Vecino (0,1) – Parcela (1,n).'],
  er:{entities:[
    {n:'Vecino', attrs:[['dni_vecino','I'],['nombre_vecino','c'],['apellido1_vecino','c'],['apellido2_vecino','co']]},
    {n:'Monitor', attrs:[['dni_monitor','I'],['nombre_monitor','c'],['apellido1_monitor','c'],['apellido2_monitor','co']]},
@@ -282,51 +281,48 @@ CREATE TABLE telefono_empleado (
   {title:'Atributo compuesto', q:'El nombre del vecino es un atributo compuesto (nombre, apellido1, apellido2). ¿Cómo queda en la tabla VECINO?',
    opts:[['Una columna por cada parte: nombre_vecino, apellido1_vecino, apellido2_vecino',true,'Los compuestos se aplanan: cada componente es una columna (apellido2 admite NULL por ser opcional).'],['Una columna nombre_c_vecino con todo junto',false,'Rompería la atomicidad (1FN) y no se podría buscar por apellido.'],['Una tabla aparte NOMBRE',false,'No es multivalorado: no hace falta otra tabla.']],
    truco:'Compuesto → una columna por componente. Multivalorado → otra tabla.'},
-  {title:'Dónde va la FK de imparte', q:'Monitor (1,1) — imparte — Taller (1,n), con el atributo fecha_celebración. Cada monitor imparte exactamente 1 taller y cada taller tiene de 1 a n monitores. ¿Dónde van la FK y el atributo?',
-   opts:[['En MONITOR: id_taller (NOT NULL) y fecha_celebracion',true,'El lado que participa UNA sola vez (Monitor, máximo 1) recibe la FK; el atributo de la relación viaja con ella. Es NOT NULL porque el mínimo es 1.'],['En TALLER: dni_monitor',false,'Eso valdría si un taller tuviera un único monitor, pero Taller es (1,n): varios monitores.'],['En una tabla IMPARTE',false,'Solo se crea tabla para las N:M; esta es 1:N.']],
-   truco:'La FK va en la entidad cuyo par tiene máximo 1 (la que se relaciona con UNA de la otra).'},
-  {title:'Dónde va la FK de cultiva', q:'Vecino (0,1) — cultiva — Parcela (1,n). ¿Qué sale en tablas?',
-   opts:[['FK id_parcela en VECINO, que admite NULL (mínimo 0)',true,'Vecino se relaciona con como mucho 1 parcela (máximo 1) → FK en VECINO; mínimo 0 → admite NULL.'],['FK dni_vecino en PARCELA',false,'Parcela es (1,n): varios vecinos por parcela, no cabrían en una columna.'],['Tabla intermedia CULTIVA',false,'Es 1:N: no hace falta.']],
-   truco:'Par con máximo 1 → ahí va la FK; mínimo 0 → NULL, mínimo 1 → NOT NULL.'}],
+  {title:'Atributo de la relación imparte', q:'"Imparte" (Taller 1,n – Monitor 1,1) lleva el atributo fecha_celebración. ¿Dónde va en tablas?',
+   opts:[['En TALLER, que es el lado N donde está la FK',true,'En una 1:N el atributo de la relación migra al lado N junto con la FK.'],['En MONITOR',false,'Un monitor da varios talleres: no tendría una única fecha.'],['En una tabla IMPARTE',false,'Solo se crea tabla para las N:M; esta es 1:N.']],
+   truco:'Relación 1:N con atributo → el atributo viaja a la tabla del lado N.'}],
  rels:[
-  {a:'Vecino', verb:'se apunta a', b:'Taller', na:['0','N'], nb:['0','N'], tipo:'N:M', attr:'fecha_alta', why:'Diagrama: Vecino (0,n) y Taller (0,n): un vecino puede apuntarse a 0..N talleres y un taller tener 0..N vecinos → N:M con el atributo fecha_alta.'},
-  {a:'Monitor', verb:'imparte', b:'Taller', na:['1','1'], nb:['1','N'], tipo:'1:N', attr:'fecha_celebracion', why:'Diagrama: Monitor (1,1) → cada monitor imparte exactamente 1 taller. Taller (1,n) → cada taller tiene de 1 a N monitores. 1:N con el atributo fecha_celebración.'},
-  {a:'Vecino', verb:'cultiva', b:'Parcela', na:['0','1'], nb:['1','N'], tipo:'1:N', why:'Diagrama: Vecino (0,1) → cada vecino cultiva 0 o 1 parcela. Parcela (1,n) → cada parcela la cultivan de 1 a N vecinos. 1:N.'}],
- asserts:[{t:'TALLER[id_taller] ⊆ MONITOR[id_taller]', why:'Taller (1,n): todo taller tiene al menos un monitor → todo taller aparece en MONITOR. La FK está en MONITOR, así que NO sale de la clave ajena: hay que escribirlo.'},{t:'PARCELA[id_parcela] ⊆ VECINO[id_parcela]', why:'Parcela (1,n): toda parcela la cultiva al menos un vecino → toda parcela aparece en VECINO.'}],
+  {a:'Vecino', verb:'se apunta a', b:'Taller', na:['0','N'], nb:['0','N'], tipo:'N:M', attr:'fecha_alta', why:'Diagrama: Vecino (0,n) y Taller (0,n) → N:M con el atributo fecha_alta en la relación.'},
+  {a:'Monitor', verb:'imparte', b:'Taller', na:['1','1'], nb:['1','N'], tipo:'1:N', attr:'fecha_celebracion', why:'Diagrama: Monitor (1,1) → cada taller lo imparte UN monitor; Taller (1,n) → todo monitor imparte al menos un taller. 1:N con el atributo fecha_celebración.'},
+  {a:'Vecino', verb:'cultiva', b:'Parcela', na:['0','1'], nb:['1','N'], tipo:'1:N', why:'Diagrama: Vecino (0,1) → una parcela puede no tener vecino (la FK admite NULL); Parcela (1,n) → todo vecino cultiva al menos una parcela (aserción).'}],
+ asserts:[{t:'VECINO[dni_vecino] ⊆ PARCELA[dni_vecino]', why:'Vecino —cultiva— Parcela (1,n): "todo vecino cultiva al menos una parcela" → todo vecino debe aparecer en PARCELA. La FK está en PARCELA, así que esto NO sale de la clave ajena: hay que escribirlo.'},{t:'MONITOR[dni_monitor] ⊆ TALLER[dni_monitor]', why:'Monitor —imparte— Taller: Taller (1,n) → todo monitor imparte al menos un taller → todo monitor aparece en TALLER.'}],
  tables:[
-  {name:'PARCELA', cols:[['id_parcela','P'],['metros','V'],['orientacion','o']], note:'La orientación es opcional (línea discontinua) → admite NULL.'},
-  {name:'VECINO', cols:[['dni_vecino','P'],['nombre_vecino','V'],['apellido1_vecino','V'],['apellido2_vecino','o'],['id_parcela','o','PARCELA']], note:'Compuesto → una columna por componente; apellido2 opcional → NULL. Vecino (0,1): se relaciona con como mucho 1 parcela → FK id_parcela en VECINO, y admite NULL (mínimo 0).'},
-  {name:'TALLER', cols:[['id_taller','P'],['cupo','V']]},
-  {name:'MONITOR', cols:[['dni_monitor','P'],['nombre_monitor','V'],['apellido1_monitor','V'],['apellido2_monitor','o'],['id_taller','V','TALLER'],['fecha_celebracion','V']], note:'Monitor (1,1): FK id_taller en MONITOR y NOT NULL (mínimo 1). fecha_celebracion, atributo de "imparte" (1:N), viaja al mismo lado que la FK.'},
+  {name:'VECINO', cols:[['dni_vecino','P'],['nombre_vecino','V'],['apellido1_vecino','V'],['apellido2_vecino','o']], note:'Atributo compuesto → una columna por componente; apellido2 es opcional (línea discontinua) → admite NULL.'},
+  {name:'MONITOR', cols:[['dni_monitor','P'],['nombre_monitor','V'],['apellido1_monitor','V'],['apellido2_monitor','o']]},
+  {name:'TALLER', cols:[['id_taller','P'],['cupo','V'],['fecha_celebracion','V'],['dni_monitor','V','MONITOR']], note:'1:N → FK en TALLER (lado N), VNN porque Monitor es (1,1). fecha_celebracion es el atributo de "imparte" y viaja a TALLER.'},
+  {name:'PARCELA', cols:[['id_parcela','P'],['metros','V'],['orientacion','o'],['dni_vecino','o','VECINO']], note:'Vecino (0,1): una parcela puede no tener vecino → la FK dni_vecino admite NULL. La orientación es opcional.'},
   {name:'SE_APUNTA', cols:[['dni_vecino','P','VECINO'],['id_taller','P','TALLER'],['fecha_alta','V']], note:'N:M → tabla intermedia con CP compuesta; fecha_alta es el atributo de la relación.'}],
- ddl:`CREATE TABLE parcela (
-  id_parcela  INT AUTO_INCREMENT PRIMARY KEY,
-  metros      DECIMAL(6,2) NOT NULL,
-  orientacion VARCHAR(10)
-);
-
-CREATE TABLE vecino (
+ ddl:`CREATE TABLE vecino (
   dni_vecino        CHAR(9) PRIMARY KEY,
   nombre_vecino     VARCHAR(50) NOT NULL,
   apellido1_vecino  VARCHAR(50) NOT NULL,
-  apellido2_vecino  VARCHAR(50),
-  id_parcela        INT NOT NULL, ⟦e1⟧
-  FOREIGN KEY (id_parcela) REFERENCES parcela(id_parcela)
-);
-
-CREATE TABLE taller (
-  id_taller         INT AUTO_INCREMENT PRIMARY KEY,
-  cupo              SMALLINT NOT NULL,
-  fecha_celebracion DATE NOT NULL ⟦e2⟧
+  apellido2_vecino  VARCHAR(50)
 );
 
 CREATE TABLE monitor (
   dni_monitor       CHAR(9) PRIMARY KEY,
   nombre_monitor    VARCHAR(50) NOT NULL,
   apellido1_monitor VARCHAR(50) NOT NULL,
-  apellido2_monitor VARCHAR(50) NOT NULL, ⟦e3⟧
-  id_taller         INT, ⟦e4⟧
-  FOREIGN KEY (id_taller) REFERENCES taller(id_taller)
+  apellido2_monitor VARCHAR(50) NOT NULL, ⟦e1⟧
+  fecha_celebracion DATE NOT NULL ⟦e2⟧
+);
+
+CREATE TABLE taller (
+  id_taller   INT AUTO_INCREMENT PRIMARY KEY,
+  cupo        SMALLINT NOT NULL,
+  dni_monitor CHAR(9), ⟦e3⟧
+  FOREIGN KEY (dni_monitor) REFERENCES monitor(dni_monitor)
+);
+
+CREATE TABLE parcela (
+  id_parcela  INT AUTO_INCREMENT PRIMARY KEY,
+  metros      DECIMAL(6,2) NOT NULL,
+  orientacion VARCHAR(10),
+  dni_vecino  CHAR(9) NOT NULL, ⟦e4⟧
+  FOREIGN KEY (dni_vecino) REFERENCES vecino(dni_vecino)
 );
 
 CREATE TABLE se_apunta (
@@ -338,11 +334,12 @@ CREATE TABLE se_apunta (
   FOREIGN KEY (id_taller) REFERENCES taller(id_taller)
 );`,
  errors:{
-  e1:{why:[['null','nulo','opcional','(0,1)','puede no','minimo 0','sin parcela']], model:'Vecino (0,1) en "cultiva": el mínimo es 0 → un vecino puede no tener parcela → <code>id_parcela</code> debe <b>admitir NULL</b>. Con NOT NULL no se podría registrar a un vecino sin parcela.'},
-  e2:{why:[['monitor','imparte','atributo','relacion','lado','otra tabla','no va','fk']], model:'<code>fecha_celebracion</code> es el atributo de la relación <b>imparte</b> (1:N): viaja al mismo lado que la FK, es decir a <b>MONITOR</b>, no a TALLER. Aquí falta en MONITOR y sobra en TALLER.'},
-  e3:{why:[['null','nulo','opcional','discontinua','puede no','obligatori','apellido2']], model:'El segundo apellido del monitor es <b>opcional</b> (línea discontinua en el diagrama) → <code>apellido2_monitor</code> debe <b>admitir NULL</b>.'},
-  e4:{why:[['not null','vnn','nulo','null','obligatori','(1,1)','minimo 1','exactamente','un taller']], model:'Monitor (1,1): cada monitor imparte <b>exactamente 1</b> taller → mínimo 1 → <code>id_taller</code> debe ser <b>NOT NULL</b>.'},
+  e1:{why:[['null','nulo','opcional','discontinua','puede no','obligatori','apellido2']], model:'El segundo apellido del monitor es <b>opcional</b> (línea discontinua en el diagrama) → <code>apellido2_monitor</code> debe <b>admitir NULL</b>.'},
+  e2:{why:[['taller','imparte','atributo','lado n','otra tabla','no va','monitor','muchos']], model:'<code>fecha_celebracion</code> es el atributo de la relación <b>imparte</b> (1:N): debe ir en <b>TALLER</b> (lado N, donde está la FK), no en MONITOR. Un monitor da varios talleres y no tiene una única fecha.'},
+  e3:{why:[['not null','vnn','nulo','null','obligatori','un unico','(1,1)','monitor']], model:'Diagrama: Monitor (1,1) → cada taller tiene <b>exactamente un</b> monitor → <code>dni_monitor</code> debe ser <b>NOT NULL</b>.'},
+  e4:{why:[['null','nulo','opcional','(0,1)','puede no','sin vecino','sin dueno','vecino']], model:'Vecino (0,1) en "cultiva": una parcela <b>puede no tener vecino</b> → <code>dni_vecino</code> debe <b>admitir NULL</b>. Con NOT NULL no se podrían registrar parcelas libres.'},
   e5:{why:[['compuesta','id_taller','las dos','ambas','falta','solo un','un solo']], model:'Tabla intermedia de la N:M: la CP debe ser <b>compuesta</b> <code>(dni_vecino, id_taller)</code>. Con solo <code>dni_vecino</code> cada vecino se apuntaría a un único taller.'}}}
+
 ); // fin C.push
 
 // alternativas aceptadas para los roles de las reflexivas
