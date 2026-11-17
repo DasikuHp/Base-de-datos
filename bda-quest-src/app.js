@@ -161,7 +161,7 @@ function caseParts(c){
   const keyTables = cq('keys').sort((a,b) => c.tables.indexOf(a.table)-c.tables.indexOf(b.table));
   const p2 = [...shuffle(keyTables).slice(0,3).sort((a,b) => c.tables.indexOf(a.table)-c.tables.indexOf(b.table)), byId(`assert:${c.id}`)];
   const p3 = [byId(`ddl:${c.id}`), byId(`ddlw:${c.id}`)];
-  const p4 = [...shuffle(D.DMLR).slice(0,5).map(t => byId('dmlr:'+t.id)), byId('dmlw:'+pick(D.DMLW).id)];
+  const p4 = [...shuffle(D.DMLR.filter(t => !t.noExam)).slice(0,5).map(t => byId('dmlr:'+t.id)), byId('dmlw:'+pick(D.DMLW).id)];
   return {1:p1, 2:p2, 3:p3, 4:p4, keyTables};
 }
 function exam(caseId){

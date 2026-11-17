@@ -83,6 +83,7 @@ label.small{display:block;margin:8px 0 2px}
 .statement img{max-width:100%;background:#fff}.rub{display:grid;gap:6px;margin:8px 0}.rub label{display:flex;gap:10px;align-items:flex-start;background:#1b1940;border:2px solid #3f3a7a;padding:8px;cursor:pointer}.rub input{width:22px;height:22px;min-width:0;margin-top:2px;accent-color:#5de8ed}
 h4{color:var(--cyan);margin:12px 0 4px}.printsheet .pitem{border-top:2px solid #514a91;margin-top:14px;padding-top:6px}.printsheet .lines{height:160px;border:1px dashed #8f89c4;margin:8px 0}
 @media print{.statement{background:#fff;border:1px solid #999;color:#000}.pitem{break-inside:avoid-page}.psol{background:#f4f4f4;padding:6px}.code{background:#f4f4f4!important;color:#000!important}.hero,.qcard{background:#fff!important;border:0!important;color:#000}h4{color:#000}}
+.svgwrap{overflow-x:auto;border:2px solid #514a91;background:#fff;margin:8px 0}.svgwrap .ersvg{display:block;border:0;margin:0;height:auto}
 @media (max-width:600px){body{font-size:16px}.brand small{display:none}.hero h1{font-size:22px}.match label{grid-template-columns:1fr}.stat{min-width:48px;padding:2px 5px}.stat small{display:none}.dl .why{padding-left:10px}}
 @media print{header,.crumb{display:none}body{background:#fff;color:#000}.block{border:1px solid #999;box-shadow:none;background:#fff;break-inside:avoid}.truco{background:#f4f4f4}.block h3{color:#000}}
 </style>
@@ -1688,6 +1689,11 @@ SQL.typoHint = typoHint;
 // ---------- parser de expresiones ----------
 const AGGS = new Set(['COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'GROUP_CONCAT']);
 const CLAUSE_END = new Set(['FROM', 'WHERE', 'GROUP', 'HAVING', 'ORDER', 'LIMIT', 'UNION', 'SET', 'VALUES', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'CROSS', 'ON', 'ASC', 'DESC', 'OFFSET']);
+function collectParen(p) {   // tras '(' : devuelve los tokens hasta el ')' que lo cierra (y lo consume)
+  const toks = []; let d = 1;
+  while (!p.done) { const x = p.next(); if (x.t === 'p' && x.v === '(') d++; if (x.t === 'p' && x.v === ')') { d--; if (!d) return toks; } toks.push(x); }
+  throw new SqlError('Falta cerrar el paréntesis de la subconsulta');
+}
 class ExprParser {
   constructor(rd) { this.p = rd; }
   expr() { return this.or(); }
@@ -1711,7 +1717,7 @@ class ExprParser {
       if (p.isW('LIKE')) { p.next(); const pat = this.add(); if (p.eatW('ESCAPE')) p.next(); a = {k: 'like', a, pat, neg}; continue; }
       if (p.isW('REGEXP') || p.isW('RLIKE')) { p.next(); const pat = this.add(); a = {k: 'regexp', a, pat, neg}; continue; }
       if (p.isW('IN')) { p.next(); p.expectP('(', 'tras IN');
-        if (p.isW('SELECT')) throw new SqlError('Las subconsultas no entran en esta parte (solo una tabla)');
+        if (p.isW('SELECT')) { a = {k: 'insub', a, toks: collectParen(p), neg}; continue; }
         const list = []; for (;;) { list.push(this.expr()); if (p.eatP(',')) continue; break; } p.expectP(')', 'al cerrar la lista de IN'); a = {k: 'in', a, list, neg}; continue; }
       if (p.isW('BETWEEN')) { p.next(); const lo = this.add(); if (!p.eatW('AND')) throw new SqlError('BETWEEN necesita AND: BETWEEN 20 AND 30', p.peek()?.pos); const hi = this.add(); a = {k: 'between', a, lo, hi, neg}; continue; }
       p.i = save; break;
@@ -1725,7 +1731,7 @@ class ExprParser {
     const p = this.p, x = p.next(); if (!x) throw new SqlError('La expresión está incompleta: falta un valor al final');
     if (x.t === 'n') return {k: 'lit', v: parseFloat(x.v)};
     if (x.t === 's') return {k: 'lit', v: x.v, str: true};
-    if (x.t === 'p' && x.v === '(') { if (p.isW('SELECT')) throw new SqlError('Las subconsultas no entran en esta parte (solo una tabla)'); const e = this.expr(); p.expectP(')', 'al cerrar el paréntesis'); return e; }
+    if (x.t === 'p' && x.v === '(') { if (p.isW('SELECT')) return {k: 'sub', toks: collectParen(p)}; const e = this.expr(); p.expectP(')', 'al cerrar el paréntesis'); return e; }
     if (x.t === 'p') throw new SqlError(`No se esperaba '${x.v}' aquí`, x.pos);
     if (x.t === 'w') {
       const u = x.u;
@@ -1794,6 +1800,8 @@ function ev(n, cx) {
       for (const [c, r] of n.whens) { const hit = n.operand ? cmpVals(op, ev(c, cx)) === 0 : bool3(ev(c, cx)) === true; if (hit) return ev(r, cx); }
       return n.els ? ev(n.els, cx) : null; }
     case 'agg': return cx.agg(n);
+    case 'sub': { const r = cx.eng.select(new Rd(n.toks)); if (r.cols.length !== 1) throw new SqlError('La subconsulta debe devolver UNA sola columna'); if (r.rows.length > 1) throw new SqlError('La subconsulta devuelve más de una fila y aquí se espera un único valor (usa IN, o un agregado como MIN/MAX/AVG)'); return r.rows.length ? r.rows[0][0] : null; }
+    case 'insub': { const v = ev(n.a, cx); const r = cx.eng.select(new Rd(n.toks)); if (r.cols.length !== 1) throw new SqlError('La subconsulta de IN debe devolver UNA sola columna'); if (v === null) return null; let seenNull = false, hit = false; for (const row of r.rows) { const c = cmpVals(v, row[0]); if (c === null) seenNull = true; else if (c === 0) { hit = true; break; } } if (hit) return b2n(!n.neg); if (seenNull) return null; return b2n(n.neg); }
     case 'fn': return callFn(n, cx);
   }
   throw new SqlError('Expresión no soportada');
@@ -1920,7 +1928,7 @@ class Engine {
   // ---- contexto de evaluación ----
   mkCx(t, rowObj, opts) {
     const cx = {
-      row: rowObj, grp: null, where: opts.where, aliases: opts.aliases || null, tname: t.name, talias: opts.talias, noAgg: opts.noAgg, strictGroup: opts.strictGroup,
+      eng: this, row: rowObj, grp: null, where: opts.where, aliases: opts.aliases || null, tname: t.name, talias: opts.talias, noAgg: opts.noAgg, strictGroup: opts.strictGroup,
       col(n) {
         if (n.tbl && ![lc(t.name), lc(opts.talias || '')].includes(lc(n.tbl))) throw new SqlError(`La tabla '${n.tbl}' no está en el FROM (Unknown table)`);
         const k = lc(n.name);
@@ -1991,7 +1999,7 @@ class Engine {
       // ONLY_FULL_GROUP_BY
       const gcols = new Set(gExprs.filter(g => g.k === 'col').map(g => lc(g.name)));
       const pkCovered = t.pk.length && t.pk.every(c => gcols.has(lc(c)));
-      const bare = (node, label) => { if (!node || pkCovered) return; (function w(n, inAgg) { if (!n) return; if (n.k === 'agg') return; if (n.k === 'col' && !(aliases.has(lc(n.name)) && !t.cols.some(c => lc(c.name) === lc(n.name)))) { if (!gcols.has(lc(n.name))) throw new SqlError(`'${n.name}' aparece en ${label} sin función de agregado y no está en el GROUP BY (MySQL: only_full_group_by). Con GROUP BY, el SELECT solo puede llevar las columnas agrupadas y funciones como COUNT/SUM/AVG/MIN/MAX.`); }
+      const bare = (node, label) => { if (!node || pkCovered) return; (function w(n, inAgg) { if (!n) return; if (n.k === 'agg') return; if (n.k === 'col' && !(aliases.has(lc(n.name)) && !t.cols.some(c => lc(c.name) === lc(n.name)))) { if (!gcols.has(lc(n.name))) throw new SqlError(groupBy.length ? `'${n.name}' aparece en ${label} sin función de agregado y no está en el GROUP BY (MySQL: only_full_group_by). Con GROUP BY, el SELECT solo puede llevar las columnas agrupadas y funciones como COUNT/SUM/AVG/MIN/MAX.` : `No se puede mezclar la columna '${n.name}' con una función de agregado (MIN, MAX, COUNT...) sin GROUP BY: el agregado devuelve UNA fila resumen y no sabe a qué '${n.name}' corresponde. Si quieres los datos de la fila con el mínimo/máximo, hay que usar una SUBCONSULTA: WHERE columna = (SELECT MIN(columna) FROM ...).`); }
         ['a', 'b', 'lo', 'hi', 'pat', 'operand', 'els'].forEach(k => n[k] && w(n[k])); (n.args || []).forEach(x => w(x)); (n.list || []).forEach(x => w(x)); (n.whens || []).forEach(x => { w(x[0]); w(x[1]); }); })(node); };
       outItems.forEach((i, ix) => { if (!gExprs.some(g => JSON.stringify(g) === JSON.stringify(i.e))) bare(i.e, `el SELECT (columna ${ix + 1})`); });
       if (having) bare(resolveAlias(having), 'HAVING'); orderBy.forEach(o => { if (!(o.e.k === 'lit' && isNum(o.e.v))) bare(resolveAlias(o.e), 'ORDER BY'); });
@@ -2151,7 +2159,7 @@ function gradeDml(task, userSql, makeEngine) {
     for (const r of refs) { const er = makeEngine(task.db); const rr = er.execAll(r).pop(); res.ref = res.ref || rr; const ordered = task.ordered !== undefined ? task.ordered : rr.ordered;
       if (rr.cols.length === last.cols.length && sameRows(last.rows, rr.rows, ordered)) { best = rr; res.ref = rr; res.ok = true; break; } }
     if (res.ok) {
-      if (task.aliases) task.aliases.forEach((a, i) => { if (lc(last.cols[i] || '') !== lc(a)) { res.ok = false; res.msgs.push(`El resultado es correcto, pero la columna ${i + 1} debía llamarse «${a}» (alias con AS) y se llama «${last.cols[i] || '?'}».`); } });
+      // el alias no es obligatorio: no se corrige el nombre de las columnas
       return res;
     }
     const rr = res.ref;
@@ -2378,6 +2386,36 @@ BQ.DMLW.push(
 {id:'w-i-23', lvl:2, db:'instituto', kind:'write', src:'UPDATE con IS NULL', title:'Rellena los teléfonos que faltan', prompt:"Pon el teléfono '600000000' a todos los alumnos que no tienen teléfono.", ref:"UPDATE alumno SET telefono = '600000000' WHERE telefono IS NULL", hints:['IS NULL en el WHERE.']},
 {id:'w-i-24', lvl:3, db:'instituto', kind:'write', src:'DELETE con varias condiciones', title:'Borra repetidores antiguos', prompt:"Elimina a los alumnos repetidores nacidos antes de 1995.", ref:"DELETE FROM alumno WHERE es_repetidor = 'sí' AND fecha_nacimiento < '1995-01-01'", hints:['Dos condiciones con AND.']},
 {id:'w-i-25', lvl:3, db:'instituto', kind:'select', src:'Agregado con filtro', title:'Edad media de los repetidores', prompt:'Calcula la edad media (aproximada) de los alumnos repetidores.', ref:["SELECT AVG(TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE())) FROM alumno WHERE es_repetidor = 'sí'", "SELECT AVG(YEAR(CURDATE()) - YEAR(fecha_nacimiento)) FROM alumno WHERE es_repetidor = 'sí'"], hints:['AVG de la edad, filtrando antes con WHERE.']}
+);
+
+// BDA-QUEST · DML según las notas del examen: subconsultas (MIN/MAX/AVG no se mezclan con columnas), funciones anidadas,
+// filtrar antes de agrupar (WHERE → GROUP BY → HAVING). El alias NO es obligatorio. lvl: 1 fácil · 2 media · 3 difícil
+window.BQ = window.BQ || {};
+BQ.DMLR.push(
+{id:'r-agg-mix', lvl:2, db:'ciclismo', kind:'select', title:'Columna + MIN sin subconsulta', prompt:'Debe mostrar el dorsal del ciclista más joven (y su edad).', bad:"SELECT dorsal, MIN(edad)\nFROM ciclista;", ref:"SELECT dorsal, edad FROM ciclista WHERE edad = (SELECT MIN(edad) FROM ciclista)", why:[['subconsulta','select interno','entre parentesis','anidad'],['min','agregad','una fila','mezclar','group by','no se puede','columna','dorsal']], model:'<b>No se puede mezclar una columna normal (dorsal) con una función de agregado (MIN) sin GROUP BY</b>: MIN devuelve una única fila resumen y no sabe a qué dorsal corresponde. Primero hay que calcular el mínimo en una <b>subconsulta</b>: <code>WHERE edad = (SELECT MIN(edad) FROM ciclista)</code>.', truco:'Datos de la fila del mínimo/máximo → subconsulta en el WHERE.'},
+{id:'r-agg-where-min', lvl:3, db:'ciclismo', kind:'select', title:'MIN directamente en el WHERE', prompt:'Debe mostrar el nombre del ciclista (o ciclistas) más joven.', bad:"SELECT nombre\nFROM ciclista\nWHERE edad = MIN(edad);", ref:"SELECT nombre FROM ciclista WHERE edad = (SELECT MIN(edad) FROM ciclista)", why:[['subconsulta','select interno','entre parentesis'],['where','agregad','no se puede','funcion','antes']], model:'Un <b>agregado no puede ir en el WHERE</b> (WHERE filtra filas antes de calcular nada). El valor mínimo se calcula en una <b>subconsulta</b> entre paréntesis: <code>WHERE edad = (SELECT MIN(edad) FROM ciclista)</code>.', truco:'WHERE col = (SELECT MIN(col) FROM tabla).'},
+{id:'r-avg-compare', lvl:3, db:'ciclismo', kind:'select', title:'Comparar con la media sin subconsulta', prompt:'Debe mostrar el nombre y la edad de los ciclistas de más edad que la media, de mayor a menor edad y, a igualdad, por nombre.', bad:"SELECT nombre, edad\nFROM ciclista\nWHERE edad > AVG(edad)\nORDER BY edad DESC, nombre;", ref:"SELECT nombre, edad FROM ciclista WHERE edad > (SELECT AVG(edad) FROM ciclista) ORDER BY edad DESC, nombre", why:[['subconsulta','select interno','entre parentesis'],['where','agregad','avg','media','no se puede']], model:'<code>AVG(edad)</code> no se puede usar directamente en el WHERE. La media se calcula antes en una <b>subconsulta</b>: <code>WHERE edad &gt; (SELECT AVG(edad) FROM ciclista)</code>.', truco:'Comparar con una media / un máximo → subconsulta.'},
+{id:'r-filter-order', lvl:3, db:'ciclismo', kind:'select', title:'Filtrar antes de agrupar: orden de cláusulas', prompt:'Debe mostrar la altura media y la categoría de los puertos cuya categoría empieza por E, solo si la media supera los 1500 m.', bad:"SELECT AVG(altura), categoria\nFROM puerto\nGROUP BY categoria\nWHERE categoria LIKE 'E%'\nHAVING AVG(altura) > 1500;", ref:"SELECT AVG(altura), categoria FROM puerto WHERE categoria LIKE 'E%' GROUP BY categoria HAVING AVG(altura) > 1500", why:[['where'],['antes','primero','group by','orden','filtra','agrup']], model:'<b>Orden</b>: el WHERE filtra las <b>filas antes de agrupar</b>, así que va <b>antes</b> del GROUP BY; después el HAVING filtra los <b>grupos</b>. <code>FROM … WHERE … GROUP BY … HAVING …</code>.', truco:'WHERE (filas) → GROUP BY → HAVING (grupos).'},
+{id:'r-nested-paren', lvl:2, db:'ciclismo', kind:'select', title:'Función anidada mal cerrada', prompt:'Debe mostrar la edad media de los ciclistas redondeada a 1 decimal.', bad:"SELECT ROUND(AVG(edad), 1\nFROM ciclista;", ref:"SELECT ROUND(AVG(edad), 1) FROM ciclista", why:[['parentesis','cierra','cerrar','falta'],['round','avg','anid','funcion','dentro']], model:'Falta cerrar el paréntesis de <code>ROUND(</code>. Con funciones anidadas hay que cerrar cada una: <code>ROUND(AVG(edad), 1)</code> (AVG dentro de ROUND).', truco:'Funciones anidadas: se resuelve de dentro hacia fuera; cuenta los paréntesis.'}
+);
+BQ.DMLR.forEach(t => { if (t.id === 'r-like-nowild') t.noExam = true; });
+
+BQ.DMLW.push(
+{id:'w-c-sub1', lvl:3, db:'ciclismo', kind:'select', src:'Subconsulta', title:'Dorsal y nombre del más joven', prompt:'Muestra el dorsal, el nombre y la edad del ciclista (o ciclistas) más joven.', ref:'SELECT dorsal, nombre, edad FROM ciclista WHERE edad = (SELECT MIN(edad) FROM ciclista)', hints:['MIN no se mezcla con dorsal en el mismo SELECT.','Calcula el mínimo en una subconsulta: (SELECT MIN(edad) FROM ciclista).']},
+{id:'w-c-sub2', lvl:3, db:'ciclismo', kind:'select', src:'Subconsulta', title:'Ciclistas por encima de la media', prompt:'Muestra el nombre y la edad de los ciclistas de más edad que la media, de mayor a menor edad y, a igualdad, por nombre.', ref:'SELECT nombre, edad FROM ciclista WHERE edad > (SELECT AVG(edad) FROM ciclista) ORDER BY edad DESC, nombre', hints:['WHERE edad > (SELECT AVG(edad) FROM ciclista).']},
+{id:'w-c-sub3', lvl:3, db:'ciclismo', kind:'select', src:'Subconsulta', title:'La etapa más larga', prompt:'Muestra el número, los km, la salida y la llegada de la etapa más larga.', ref:'SELECT netapa, km, salida, llegada FROM etapa WHERE km = (SELECT MAX(km) FROM etapa)', hints:['WHERE km = (SELECT MAX(km) FROM etapa).']},
+{id:'w-c-sub4', lvl:3, db:'ciclismo', kind:'select', src:'Subconsulta', title:'Puertos más altos que la media', prompt:'Muestra el nombre y la altura de los puertos por encima de la altura media, de mayor a menor altura y, a igualdad, por nombre.', ref:'SELECT nompuerto, altura FROM puerto WHERE altura > (SELECT AVG(altura) FROM puerto) ORDER BY altura DESC, nompuerto', hints:['La media se calcula en una subconsulta.']},
+{id:'w-c-filt1', lvl:3, db:'ciclismo', kind:'select', src:'Filtrar antes de agrupar', title:'Altura media por categoría (filtrando antes)', prompt:'Muestra la altura media y la categoría de los puertos cuya categoría empieza por E, y solo si esa media supera los 1500 metros.', ref:"SELECT AVG(altura), categoria FROM puerto WHERE categoria LIKE 'E%' GROUP BY categoria HAVING AVG(altura) > 1500", hints:['Filtro de filas → WHERE (antes de agrupar). Filtro de grupo → HAVING.','Orden: WHERE → GROUP BY → HAVING.']},
+{id:'w-c-filt2', lvl:3, db:'ciclismo', kind:'select', src:'Filtrar antes de agrupar', title:'Edad media por equipo con filtro previo', prompt:'Calcula la edad media por equipo teniendo en cuenta solo a los ciclistas de 25 años o más, y muestra los equipos cuya media supera los 29.', ref:'SELECT nomeq, AVG(edad) FROM ciclista WHERE edad >= 25 GROUP BY nomeq HAVING AVG(edad) > 29', hints:['edad >= 25 se filtra ANTES de agrupar (WHERE).','La media > 29 se filtra DESPUÉS (HAVING).']},
+{id:'w-h-sub1', lvl:3, db:'huerto', kind:'select', src:'Subconsulta', title:'Parcelas mayores que la media', prompt:'Muestra id_parcela y metros de las parcelas más grandes que la media, de mayor a menor.', ref:'SELECT id_parcela, metros FROM Parcela WHERE metros > (SELECT AVG(metros) FROM Parcela) ORDER BY metros DESC', hints:['WHERE metros > (SELECT AVG(metros) FROM Parcela).']},
+{id:'w-h-sub2', lvl:3, db:'huerto', kind:'select', src:'Subconsulta', title:'Dueño de la parcela más grande', prompt:'Muestra el dni_vecino y los metros de la parcela más grande.', ref:'SELECT dni_vecino, metros FROM Parcela WHERE metros = (SELECT MAX(metros) FROM Parcela)', hints:['No mezcles dni_vecino con MAX: subconsulta.']},
+{id:'w-i-sub1', lvl:3, db:'instituto', kind:'select', src:'Subconsulta', title:'El alumno de mayor edad', prompt:'Muestra el nombre, el primer apellido y la fecha de nacimiento del alumno de mayor edad (el nacido primero).', ref:'SELECT nombre, apellido1, fecha_nacimiento FROM alumno WHERE fecha_nacimiento = (SELECT MIN(fecha_nacimiento) FROM alumno)', hints:['El mayor es el de fecha de nacimiento MÍNIMA.']},
+{id:'w-h-nest1', lvl:2, db:'huerto', kind:'select', src:'Funciones anidadas', title:'Tres primeras letras en mayúsculas', prompt:'Muestra las tres primeras letras del nombre de cada vecino en mayúsculas.', ref:['SELECT UPPER(SUBSTRING(nombre_v_vecino, 1, 3)) FROM Vecino', 'SELECT UPPER(LEFT(nombre_v_vecino, 3)) FROM Vecino'], hints:['Anida: UPPER( SUBSTRING( … ) ). Se resuelve de dentro hacia fuera.']},
+{id:'w-h-nest2', lvl:2, db:'huerto', kind:'select', src:'Funciones anidadas', title:'Media redondeada por orientación', prompt:'Muestra cada orientación con la superficie media de sus parcelas redondeada a 1 decimal.', ref:'SELECT orientacion, ROUND(AVG(metros), 1) FROM Parcela GROUP BY orientacion', hints:['ROUND( AVG(metros), 1 ) con GROUP BY orientacion.']},
+{id:'w-i-nest1', lvl:2, db:'instituto', kind:'select', src:'Funciones anidadas', title:'Longitud del nombre y primer apellido', prompt:'Muestra cuántos caracteres tiene el nombre seguido de un espacio y el primer apellido de cada alumno.', ref:"SELECT CHAR_LENGTH(CONCAT(nombre, ' ', apellido1)) FROM alumno", hints:['CHAR_LENGTH( CONCAT(...) ).']},
+{id:'w-c-nest1', lvl:2, db:'ciclismo', kind:'select', src:'Funciones anidadas', title:'Edad media sin decimales', prompt:'Muestra la edad media de los ciclistas redondeada a un entero.', ref:'SELECT ROUND(AVG(edad)) FROM ciclista', hints:['ROUND(AVG(edad)).']},
+{id:'w-c-nest2', lvl:2, db:'ciclismo', kind:'select', src:'Funciones anidadas', title:'Nombre de equipo más largo', prompt:'Muestra cuántos caracteres tiene el nombre de equipo más largo.', ref:'SELECT MAX(CHAR_LENGTH(nomeq)) FROM equipo', hints:['MAX( CHAR_LENGTH(nomeq) ).']},
+{id:'w-i-nest2', lvl:2, db:'instituto', kind:'select', src:'Funciones anidadas', title:'Año del alumno más joven', prompt:'Muestra el año de nacimiento del alumno más joven.', ref:'SELECT YEAR(MAX(fecha_nacimiento)) FROM alumno', hints:['YEAR( MAX(fecha_nacimiento) ).']}
 );
 
 // BDA-QUEST · contenido SOLO para el modo papel: E/R de los boletines (con solución propuesta),
@@ -3103,7 +3141,7 @@ function checkDmlr(q) {
 }
 function renderDmlw(q) {
   const t = q.t; st.hint = 0;
-  return `${dmlCommon(t)}${t.aliases ? `<p class="small">La columna debe llamarse <code>${esc(t.aliases.join(', '))}</code>.</p>` : ''}
+  return `${dmlCommon(t)}
   <div class="row"><button class="ghost" onclick="BQA.dmlHint()" id="dmlHintBtn">💡 Pista (0/${(t.hints || []).length})</button>${t.skeleton ? '<button class="ghost" onclick="BQA.dmlSkel()">🧩 Plantilla</button>' : ''}</div><div id="dmlHints"></div>
   <textarea id="dmlIn" class="editor" rows="6" spellcheck="false" placeholder="Escribe aquí tu sentencia SQL…">${esc(st.typed || '')}</textarea><p class="small">Se corrige <b>ejecutándola</b> sobre los datos y comparando el resultado con el de la solución.</p>`;
 }
@@ -3141,6 +3179,46 @@ T2.erSvg = function (c) {
   return s + '</svg>';
 };
 
+
+// ---------- dibujo del E/R COMPLETO (con atributos), como en el examen ----------
+T2.erSvgFull = function (c) {
+  const er = T2.erOf(c), attrsOf = n => { const e = er.entities.find(x => sameName(x.n, n)); return e ? e.attrs : []; };
+  const names = [...new Set(c.rels.flatMap(r => r.ternary ? r.ternary.map(x => x.e) : [r.a, r.b]))];
+  const N = names.length, big = N > 4, W = big ? 1240 : 1000, H = big ? 800 : 640, cx = W / 2, cy = H / 2, rx = W * (N <= 2 ? .28 : .33), ry = H * (N <= 2 ? .1 : .31), pos = {};
+  names.forEach((e, i) => { const a = N === 1 ? 0 : (i / N) * Math.PI * 2 - Math.PI / 2 + (N === 2 ? Math.PI / 2 : 0); pos[e] = [cx + rx * Math.cos(a), cy + ry * Math.sin(a), a]; });
+  let lines = '', shapes = '';
+  const tw = t => Math.max(54, 6.6 * String(t).length + 18);
+  const ent = (x, y, t) => `<rect x="${x - 48}" y="${y - 16}" width="96" height="32" fill="#fff" stroke="#111" stroke-width="2"/><text x="${x}" y="${y + 5}" text-anchor="middle" font-size="14" font-weight="700" fill="#111">${esc(t)}</text>`;
+  const rhomb = (x, y, t) => `<polygon points="${x},${y - 20} ${x + Math.max(48, 3.6 * t.length + 14)},${y} ${x},${y + 20} ${x - Math.max(48, 3.6 * t.length + 14)},${y}" fill="#fff" stroke="#111" stroke-width="2"/><text x="${x}" y="${y + 4}" text-anchor="middle" font-size="11" fill="#111">${esc(t)}</text>`;
+  const attr = (x, y, a, dashed) => { const f = a[1] || '', w = tw(a[0]), id = /I/.test(f), part = /p/.test(f), multi = /m/.test(f);
+    lines += `<line x1="${x}" y1="${y}" x2="${a._ex}" y2="${a._ey}" stroke="#111" stroke-width="1.3" ${/o/.test(f) ? 'stroke-dasharray="5 4"' : ''}/>`;
+    return `${multi ? `<ellipse cx="${x}" cy="${y}" rx="${w / 2 + 5}" ry="19" fill="#fff" stroke="#111" stroke-width="1.3"/>` : ''}<ellipse cx="${x}" cy="${y}" rx="${w / 2}" ry="${multi ? 15 : 14}" fill="#fff" stroke="#111" stroke-width="1.3"/><text x="${x}" y="${y + 4}" text-anchor="middle" font-size="11" fill="#111" ${id ? 'font-weight="700" text-decoration="underline"' : ''} ${part ? 'text-decoration="underline" style="text-decoration-style:dashed"' : ''}>${esc(a[0])}</text>`; };
+  // relaciones
+  const pairCount = {};
+  c.rels.forEach(r => {
+    const key = r.ternary ? null : [r.a, r.b].sort().join('|'); if (key) pairCount[key] = (pairCount[key] || 0) + 1; const off = key ? (pairCount[key] - 1) * 56 : 0;
+    const lab = (x1, y1, x2, y2, t, dx = 0) => `<text x="${x1 + (x2 - x1) * .27 + dx}" y="${y1 + (y2 - y1) * .27 - 6}" text-anchor="middle" font-size="12" font-weight="700" fill="#b02a2a">${esc(t)}</text>`;
+    let mx, my;
+    if (r.ternary) { const pts = r.ternary.map(x => pos[x.e]); mx = pts.reduce((a, p) => a + p[0], 0) / 3; my = pts.reduce((a, p) => a + p[1], 0) / 3;
+      r.ternary.forEach((x, i) => { lines += `<line x1="${pts[i][0]}" y1="${pts[i][1]}" x2="${mx}" y2="${my}" stroke="#111" stroke-width="1.6"/>`; shapes += lab(pts[i][0], pts[i][1], mx, my, fp2(x.m)); }); }
+    else if (r.a === r.b) { const [x, y, a0] = pos[r.a], a = a0 + Math.PI, ox = Math.cos(a) * 110, oy = Math.sin(a) * 110; mx = x + ox; my = y + oy;
+      lines += `<line x1="${x}" y1="${y}" x2="${mx}" y2="${my}" stroke="#111" stroke-width="1.6"/>`; lines += `<path d="M ${x + 30} ${y + 12} Q ${mx + 70 * Math.sin(a)} ${my - 70 * Math.cos(a)} ${mx} ${my}" fill="none" stroke="#111" stroke-width="1.6"/>`;
+      shapes += `<text x="${x + 54 * Math.cos(a) + 18}" y="${y + 54 * Math.sin(a) - 8}" font-size="11" font-weight="700" fill="#b02a2a">${fp2(r.na)} ${esc(r.roles ? r.roles.a : '')}</text><text x="${x + 54 * Math.cos(a) + 18}" y="${y + 54 * Math.sin(a) + 16}" font-size="11" font-weight="700" fill="#b02a2a">${fp2(r.nb)} ${esc(r.roles ? r.roles.b : '')}</text>`; }
+    else { const [x1, y1] = pos[r.a], [x2, y2] = pos[r.b]; const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1; mx = (x1 + x2) / 2 - dy / L * off; my = (y1 + y2) / 2 + dx / L * off;
+      lines += `<line x1="${x1}" y1="${y1}" x2="${mx}" y2="${my}" stroke="#111" stroke-width="1.6"/><line x1="${mx}" y1="${my}" x2="${x2}" y2="${y2}" stroke="#111" stroke-width="1.6"/>`;
+      shapes += lab(x1, y1, mx, my, fp2(r.na)) + lab(x2, y2, mx, my, fp2(r.nb)); }
+    shapes += rhomb(mx, my, r.verb);
+    String(r.attr || '').split(',').map(x => x.trim()).filter(Boolean).forEach((an, i) => { const ax = mx + 20 + i * 8, ay = my - 62 - i * 30; lines += `<line x1="${mx}" y1="${my - 20}" x2="${ax}" y2="${ay + 14}" stroke="#111" stroke-width="1.3"/>`; shapes += `<ellipse cx="${ax}" cy="${ay}" rx="${tw(an) / 2}" ry="14" fill="#fff" stroke="#111" stroke-width="1.3"/><text x="${ax}" y="${ay + 4}" text-anchor="middle" font-size="11" fill="#111">${esc(an)}</text>`; });
+  });
+  // entidades y atributos
+  names.forEach(n => { const [x, y, a] = pos[n], at = attrsOf(n), k = at.length;
+    const out = N === 1 ? -Math.PI / 2 : a, spread = Math.min(2.7, .62 * Math.max(1, k - 1)), R = 82 + 7 * k;
+    at.forEach((q, i) => { const ang = k === 1 ? out : out - spread / 2 + spread * i / (k - 1), ax = x + R * Math.cos(ang), ay = y + R * Math.sin(ang) * .78; q._ex = x + 48 * Math.cos(ang) * .9; q._ey = y + 16 * Math.sin(ang) * 1.1; shapes += attr(ax, ay, q); });
+    shapes += ent(x, y, n); });
+  return `<div class="svgwrap"><svg viewBox="0 0 ${W} ${H}" class="ersvg" style="min-width:${big ? 900 : 720}px" role="img" aria-label="E/R de ${esc(c.name)}"><rect width="${W}" height="${H}" fill="#fff"/>${lines}${shapes}</svg></div>`;
+};
+const fp2 = p => `(${p[0]},${p[1]})`;
+
 window.T2 = T2;
 Object.assign(T2, {renderEnts, checkEnts, renderAttrs, checkAttrs, renderCard, checkCard, renderAssert, checkAssert, renderDdlw, checkDdlw, renderDmlr, checkDmlr, renderDmlw, checkDmlw});
 T2.render = q => ({ents: renderEnts, attrs: renderAttrs, card: renderCard, assert: renderAssert, ddlw: renderDdlw, dmlr: renderDmlr, dmlw: renderDmlw})[q.type](q);
@@ -3177,6 +3255,8 @@ function marcoText(t, tables) {
   const v = t.cols.filter(c => /V/.test(c[1]) && !/P/.test(c[1])).map(c => `VNN(${c[0]})`); if (v.length) L.push(v.join('  '));
   return L.join('\n');
 }
+const diagram = c => c.img ? `<img src="${c.img}" alt="E/R" style="max-width:100%;background:#fff">` : (T2.erOf(c).entities.length <= 7 ? T2.erSvgFull(c) : T2.erSvg(c) + `<h4>Atributos</h4><ul class="plist">${T2.erOf(c).entities.map(e => `<li>${entText(e)}</li>`).join('')}</ul>`);
+const textoPlegado = c => `<details class="rules"><summary>Enunciado en texto (por si el dibujo no se ve bien)</summary>${rulesList(c)}</details>`;
 const rulesList = c => `<ol class="prules">${c.rules.map(r => `<li>${noB(r)}</li>`).join('')}</ol>`;
 
 // ---------- explicación de una sentencia SQL ("cómo se piensa") ----------
@@ -3229,7 +3309,7 @@ function explainOne(sql) {
   const kind = (/^\s*(SELECT|UPDATE|DELETE|INSERT)/i.exec(sql) || [])[1]; if (!kind) return '';
   if (/^SELECT$/i.test(kind)) {
     if (g('FROM')) steps.push(`<b>FROM</b> ${esc(g('FROM'))}: de qué tabla salen los datos.`);
-    if (g('WHERE')) steps.push(`<b>WHERE</b>: se quedan las filas en las que ${esc(condsText(g('WHERE')))}.`);
+    if (g('WHERE')) steps.push(`<b>WHERE</b>: se quedan las filas en las que ${esc(condsText(g('WHERE')))}.${/\(\s*SELECT/i.test(g('WHERE')) ? ' La <b>subconsulta</b> entre paréntesis se calcula <b>primero</b> y su resultado se usa en la condición.' : ''}`);
     if (g('GROUP BY')) steps.push(`<b>GROUP BY</b> ${esc(g('GROUP BY'))}: se agrupa, una fila por cada valor.`);
     if (g('HAVING')) steps.push(`<b>HAVING</b>: se quedan los grupos en los que ${esc(condsText(g('HAVING')))}.`);
     const sel = g('SELECT'); if (sel) steps.push(`<b>SELECT</b>: se muestra ${splitTop(sel.replace(/^DISTINCT\s+/i, ''), ',').map(x => esc(itemText(x))).join('; ')}${/^DISTINCT/i.test(sel) ? ' (sin repetir filas: DISTINCT)' : ''}.`);
@@ -3299,7 +3379,7 @@ function mutateDdl(model, k) {
 
 // ---------- chuletas ----------
 const CHULETA = {
-  dml: '<ol class="plist"><li>Orden: <code>SELECT · FROM · WHERE · GROUP BY · HAVING · ORDER BY · LIMIT</code>.</li><li>Una fila / unas filas concretas: <code>WHERE clave = valor</code>. UPDATE y DELETE <b>siempre</b> con WHERE.</li><li>NULL: <code>IS NULL</code> / <code>IS NOT NULL</code> (nunca = NULL).</li><li>Texto y fechas entre comillas simples; fechas <code>\'AAAA-MM-DD\'</code>.</li><li>LIKE: <code>%</code> = cualquier texto, <code>_</code> = una letra. BETWEEN incluye los extremos.</li><li>AND/OR mezclados → paréntesis. Varias columnas en SET → comas.</li><li>Agregados: COUNT, SUM, AVG, MIN, MAX. Columna normal + agregado → GROUP BY. Filtrar filas → WHERE; filtrar grupos → HAVING.</li><li>Los N mayores: <code>ORDER BY col DESC LIMIT N</code>. Sin repetir: DISTINCT.</li><li>Funciones: CONCAT, UPPER, LOWER, CHAR_LENGTH, SUBSTRING, ROUND, YEAR, MONTH, DAYNAME, CASE WHEN.</li><li>INSERT: <code>INSERT INTO t (cols) VALUES (...)</code>, valores en el orden de las columnas.</li><li>Borrar un padre con hijos: primero los hijos.</li></ol>',
+  dml: '<ol class="plist"><li>Orden: <code>SELECT · FROM · WHERE · GROUP BY · HAVING · ORDER BY · LIMIT</code>.</li><li>Una fila / unas filas concretas: <code>WHERE clave = valor</code>. UPDATE y DELETE <b>siempre</b> con WHERE.</li><li>NULL: <code>IS NULL</code> / <code>IS NOT NULL</code> (nunca = NULL).</li><li>Texto y fechas entre comillas simples; fechas <code>\'AAAA-MM-DD\'</code>.</li><li>LIKE: <code>%</code> = cualquier texto, <code>_</code> = una letra. BETWEEN incluye los extremos.</li><li>AND/OR mezclados → paréntesis. Varias columnas en SET → comas.</li><li>Agregados: COUNT, SUM, AVG, MIN, MAX. Columna normal + agregado → GROUP BY. Filtrar filas → WHERE; filtrar grupos → HAVING.</li><li>Los N mayores: <code>ORDER BY col DESC LIMIT N</code>. Sin repetir: DISTINCT.</li><li>Funciones: CONCAT, UPPER, LOWER, CHAR_LENGTH, SUBSTRING, ROUND, YEAR, MONTH, DAYNAME, CASE WHEN.</li><li>INSERT: <code>INSERT INTO t (cols) VALUES (...)</code>, valores en el orden de las columnas.</li><li>Borrar un padre con hijos: primero los hijos.</li><li><b>Agregado + columna</b> en el mismo SELECT sin GROUP BY: no se puede (<code>SELECT dorsal, MIN(edad)</code>). Datos de la fila del mínimo/máximo → <b>subconsulta</b>: <code>WHERE edad = (SELECT MIN(edad) FROM ciclista)</code>.</li><li>Filtrar <b>antes</b> de agrupar → WHERE; filtrar el resultado de un grupo → HAVING. Orden: WHERE → GROUP BY → HAVING.</li><li>Funciones anidadas: se resuelven de dentro hacia fuera: <code>ROUND(AVG(edad), 1)</code>, <code>UPPER(SUBSTRING(nombre, 1, 3))</code>.</li><li>El alias (<code>AS nombre</code>) <b>no es obligatorio</b>.</li></ol>',
   ddl: '<ol class="plist"><li>Una tabla por entidad (<b>singular</b>) y una intermedia por cada N:M / ternaria / multivalorado.</li><li>Crea primero las tablas a las que apuntan otras (orden).</li><li>Por tabla: columnas con tipo → <code>NOT NULL</code> si es obligatorio → <code>PRIMARY KEY</code> (compuesta una sola vez) → <code>UNIQUE</code> en alternativas → <code>FOREIGN KEY (x) REFERENCES T(pk)</code>.</li><li>Si el enunciado da un identificador natural (DNI, matrícula, ISBN...) esa es la CP; solo hay <code>id</code> si el enunciado lo da o no hay ninguna clave.</li><li>FK obligatoria (mínimo 1) → NOT NULL; opcional (mínimo 0) → sin NOT NULL. La FK y la columna referenciada, del mismo tipo.</li><li>Tipos: INT, VARCHAR(n), CHAR(n), DATE, DATETIME, DECIMAL(8,2), ENUM(\'a\',\'b\').</li><li>Sin consultas en el DDL.</li></ol>',
   er: '<ol class="plist"><li>Entidades = sustantivos con identificador, en <b>singular</b>. Verbos = relaciones. Datos = atributos.</li><li>Por atributo: identificador (subrayado), opcional, multivalorado (doble óvalo), compuesto, derivado.</li><li>Par (min,max) <b>pegado a la entidad que se cuenta</b>: Cliente (1,1) — realiza — (0,N) Pedido = cada pedido, exactamente 1 cliente; un cliente, 0 a N pedidos. Escribe la frase.</li><li>«Puede / ninguno» → 0 · «siempre / exactamente / al menos uno / todo» → 1 · «varios» → N.</li><li>Reflexiva: mismo nombre en las dos puntas + rol en cada una. Ternaria: tres pares y atributos colgando del rombo.</li><li>Si la misma pareja se repite en fechas distintas, la relación pasa a ser una entidad.</li><li>Entidad débil: no se identifica sola (doble rectángulo, rombo doble, clave parcial). ISA: parcial/total, disyunta/solapada.</li></ol>',
   tab: '<ol class="plist"><li>Una tabla por entidad, por N:M, por ternaria y por atributo multivalorado. Nombres en singular y mayúsculas.</li><li>1:N → FK en la tabla del lado N. N:M → intermedia con las dos FKs y CP compuesta (atributos de la relación ahí).</li><li>Mínimo 1 → VNN en la FK · mínimo 0 → admite NULL. 1:1 → FK + C.Alt (UNIQUE).</li><li>Reflexiva 1:N → FK a la propia tabla. Ternaria → 3 FKs y CP de las tres. Débil → CP = clave del fuerte + parcial.</li><li><b>Existencialidad</b>: mínimo 1 en la entidad del lado "1" → ASERCIÓN <code>PADRE[clave] ⊆ HIJA[fk]</code>. ISA total → <code>SUP ⊆ SUB1 ∪ SUB2</code>; disyunta → <code>SUB1 ∩ SUB2 = ∅</code>.</li><li>Por tabla: CP · C.Alt · C.Aj · VNN.</li></ol>',
@@ -3313,7 +3393,7 @@ function paperMeta(id) {
   if (k === 'er' || k === 'tab') { const c = caseAny(rest), n = T2.erOf(c).entities.length; return {title: `${k === 'er' ? 'E/R' : 'Tablas'} · ${c.name}`, level: c.level || 2, min: k === 'er' ? 3 + 2 * n : 2 + 2 * c.tables.length}; }
   if (k === 'ddlv') { const c = caseAny(rest); return {title: `DDL validar · ${c.name}`, level: c.level || 2, min: 7}; }
   if (k === 'ddlg') { const c = caseAny(rest); return {title: `DDL con errores (generado) · ${c.name}`, level: c.level || 2, min: 6}; }
-  if (k === 'ddlw' || k === 'ddlh') { const c = caseAny(rest), n = ddlNames(c, k === 'ddlh').length; return {title: `DDL ${k === 'ddlh' ? 'solo enunciado' : 'desde cero'} · ${c.name}`, level: k === 'ddlh' ? 3 : (c.level || 2), min: 2 + 2 * n}; }
+  if (k === 'ddlw' || k === 'ddlh') { const c = caseAny(rest), n = ddlNames(c).length; return {title: `DDL desde el E/R · ${c.name}`, level: c.level || 2, min: 3 + 2 * n}; }
   if (k === 'dmlr') { const t = D.DMLR.find(x => x.id === rest); return {title: `DML revisar · ${t.title}`, level: dmlLevel(t), min: 3}; }
   if (k === 'dmlw') { const t = D.DMLW.find(x => x.id === rest), l = dmlLevel(t); return {title: `DML desde cero · ${t.title}`, level: l, min: l === 1 ? 2 : l === 2 ? 4 : 6}; }
   if (k === 'ddls') { const t = D.DDLS.find(x => x.id === rest); return {title: `DDL ${t.title}`, level: t.lvl, min: 3 + t.lvl * 2}; }
@@ -3328,7 +3408,7 @@ function paperMeta(id) {
 function paperItem(id) {
   const k = id.split(':')[0], rest = id.split(':').slice(1).join(':'); let it;
   if (k === 'er') it = itemER(caseAny(rest)); else if (k === 'tab') it = itemTab(caseAny(rest)); else if (k === 'ddlv') it = itemDdlV(caseAny(rest)); else if (k === 'ddlg') it = itemDdlG(caseAny(rest));
-  else if (k === 'ddlw') it = itemDdlW(caseAny(rest), false); else if (k === 'ddlh') it = itemDdlW(caseAny(rest), true);
+  else if (k === 'ddlw' || k === 'ddlh') it = itemDdlW(caseAny(rest));
   else if (k === 'dmlr') it = itemDmlR(D.DMLR.find(t => t.id === rest)); else if (k === 'dmlw') it = itemDmlW(D.DMLW.find(t => t.id === rest));
   else if (k === 'ddls') it = itemDdls(D.DDLS.find(t => t.id === rest)); else if (k === 'norm') it = itemNorm(D.NORM.find(t => t.id === rest)); else if (k === 'card0') it = itemCard0(); else if (k === 'card1') it = itemCard1(+rest); else if (k === 'tab0') it = itemTab0(+rest);
   const m = paperMeta(id); it.level = m.level; it.min = m.min; it.chuleta = chuletaFor(id); return it;
@@ -3365,27 +3445,29 @@ function itemDdlV(c) {
   const num = lines.map((l, i) => `${String(i + 1).padStart(2)}  ${l.text}`).join('\n');
   const prim = e => lines.findIndex(l => l.errs.includes(e)) + 1;
   const hints = [`Hay ${ids.length} errores respecto al enunciado.`, 'Recorre tabla a tabla: ¿PK? ¿FKs (y a qué tabla/columna)? ¿NOT NULL donde toca y solo donde toca? ¿UNIQUE? ¿orden de creación? ¿nombres en singular?', `Errores en las líneas: ${ids.map(prim).sort((a, b) => a - b).join(', ')}.`, 'En el porqué, cita la regla del enunciado (R1, R2...) y di cómo quedaría bien.'];
-  return {id: 'ddlv:' + c.id, part: 3, title: `DDL: validar · ${c.name}`, src: c.from, statement: `${rulesList(c)}<p>Marca las líneas con error y explica por qué (campo libre). Si falta algo, indica dónde debería ir.</p><pre class="code">${esc(num)}</pre>`, hints,
+  return {id: 'ddlv:' + c.id, part: 3, title: `DDL: validar · ${c.name}`, src: c.from, statement: `${diagram(c)}${textoPlegado(c)}<p>Este DDL pretende ser el paso a tablas del E/R. Marca las líneas con error y explica por qué (campo libre). Si falta algo, indica dónde debería ir.</p><pre class="code">${esc(num)}</pre>`, hints,
     solution: `<ol class="plist">${ids.map(e => `<li><b>Línea ${prim(e)}:</b> ${c.errors[e].model}</li>`).join('')}</ol>`, rubric: ids.map(e => `Línea ${prim(e)} encontrada y explicada: ${esc(strip(c.errors[e].model).slice(0, 110))}…`)};
 }
 function itemDdlG(c) {
   const k = (c.level || 2) === 1 ? 3 : (c.level || 2) === 2 ? 4 : 6, model = ddlModel(c.tables), errors = mutateDdl(model, k), lines = renderDdl(model);
   const num = lines.map((l, i) => `${String(i + 1).padStart(2)}  ${l.text}`).join('\n'), where = id => lines.findIndex(l => l.errs.includes(id)) + 1;
   const hints = [`Hay ${errors.length} errores respecto al enunciado.`, 'Recorre tabla a tabla: ¿PK completa? ¿FKs (y a qué tabla)? ¿NOT NULL donde toca y solo donde toca? ¿UNIQUE? ¿orden de creación? ¿nombres en singular?', `Errores en las líneas: ${errors.map(e => where(e.id)).sort((a, b) => a - b).join(', ')}.`, 'En el porqué, cita la regla del enunciado y di cómo quedaría bien.'];
-  return {id: 'ddlg:' + c.id, part: 3, title: `DDL con errores · ${c.name}`, src: 'Generado: cada vez salen errores distintos', statement: `${rulesList(c)}<p>Marca las líneas con error y explica por qué (campo libre). Si falta algo, indica dónde debería ir.</p><pre class="code">${esc(num)}</pre>`, hints,
+  return {id: 'ddlg:' + c.id, part: 3, title: `DDL con errores · ${c.name}`, src: 'Generado: cada vez salen errores distintos', statement: `${diagram(c)}${textoPlegado(c)}<p>Este DDL pretende ser el paso a tablas del E/R. Marca las líneas con error y explica por qué (campo libre). Si falta algo, indica dónde debería ir.</p><pre class="code">${esc(num)}</pre>`, hints,
     solution: `<ol class="plist">${errors.map(e => `<li><b>Línea ${where(e.id)}:</b> ${e.model}</li>`).join('')}</ol><details class="rules"><summary>Ver el DDL correcto</summary><pre class="code">${esc(renderDdl(ddlModel(c.tables)).map(l => l.text).join('\n'))}</pre></details>`, rubric: errors.map(e => `Línea ${where(e.id)} encontrada y explicada: ${esc(strip(e.model).slice(0, 100))}…`)};
 }
-function ddlNames(c, hard) { const T = c.tables; if (T.length <= (hard ? 7 : 4)) return T.map(t => t.name); if (hard) return []; const t0 = T.find(t => t.cols.some(x => x[2] && x[2] !== t.name)) || T[0], names = [t0.name]; t0.cols.forEach(x => { if (x[2] && x[2] !== t0.name && !names.includes(x[2]) && names.length < 4) names.push(x[2]); }); return names; }
-function itemDdlW(c, hard) {
-  const names = ddlNames(c, hard), sub = names.map(n => c.tables.find(t => t.name === n)), model = ddlModel(c.tables, names), sol = renderDdl(model).map(l => l.text).join('\n');
+function ddlNames(c) { const T = c.tables; if (T.length <= 8) return T.map(t => t.name); const t0 = T.find(t => t.cols.some(x => x[2] && x[2] !== t.name)) || T[0], names = [t0.name]; t0.cols.forEach(x => { if (x[2] && x[2] !== t0.name && !names.includes(x[2]) && names.length < 4) names.push(x[2]); }); return names; }
+function itemDdlW(c) {
+  const names = ddlNames(c), sub = names.map(n => c.tables.find(t => t.name === n)), model = ddlModel(c.tables, names), sol = renderDdl(model).map(l => l.text).join('\n'), all = names.length === c.tables.length;
   const rub = []; sub.forEach(t => { const pk = t.cols.filter(x => /P/.test(x[1])).map(x => x[0]); rub.push(`<b>${esc(t.name)}</b>: PRIMARY KEY (${esc(pk.join(', '))})`);
     const groups = new Map(); t.cols.filter(x => x[2] && names.includes(x[2])).forEach(x => { const g = x[2] + '#' + (x[4] || x[0]); if (!groups.has(g)) groups.set(g, {to: x[2], cols: []}); groups.get(g).cols.push(x[0]); }); groups.forEach(g => rub.push(`FK ${esc(t.name)}(${esc(g.cols.join(', '))}) → ${esc(g.to)}`));
     const nn = t.cols.filter(x => /V/.test(x[1]) && !/P/.test(x[1])).map(x => x[0]); if (nn.length) rub.push(`NOT NULL en ${esc(t.name)}: ${esc(nn.join(', '))}`);
     t.cols.filter(x => /A/.test(x[1])).forEach(x => rub.push(`UNIQUE en ${esc(t.name)}.${esc(x[0])}`)); });
   rub.push('Tablas en singular y creadas en el orden correcto'); rub.push('Sin consultas (solo CREATE TABLE)');
-  const hints = hard ? ['Primero decide las tablas: una por entidad, una intermedia por cada N:M / ternaria / multivalorado.', 'Después las columnas de cada una (los atributos del enunciado) y qué FKs salen de cada relación.', 'Crea primero las tablas a las que apuntan otras. FK obligatoria → NOT NULL; opcional → sin NOT NULL.', 'Claves: si el enunciado da un identificador natural (DNI, ISBN...), es la CP.']
-    : ['Orden de creación: primero las tablas a las que apuntan otras.', 'Para cada tabla: columnas con tipo → NOT NULL en lo obligatorio → PRIMARY KEY (compuesta una sola vez) → UNIQUE en alternativas → FOREIGN KEY ... REFERENCES.', `Tablas: ${sub.map(t => t.name).join(', ')}. FK obligatoria → NOT NULL; opcional → sin NOT NULL.`, 'Los tipos no son lo importante: INT, VARCHAR(n), DATE, DECIMAL(8,2).'];
-  return {id: (hard ? 'ddlh:' : 'ddlw:') + c.id, part: 3, title: `DDL: ${hard ? 'solo enunciado' : 'desde cero'} · ${c.name}`, src: c.from, statement: `${rulesList(c)}<p>Escribe el DDL (solo CREATE TABLE, sin consultas) ${hard ? 'de todo el enunciado: deduce tú las tablas, las columnas y las claves' : 'de estas ' + sub.length + ' tablas'}. Tablas en singular y en el orden correcto.</p>${hard ? '' : `<pre class="code">${esc(sub.map(t => marcoLine(t, false)).join('\n'))}</pre><p class="small">Las claves y los nulos los deduces del enunciado.</p>`}`, hints,
+  const er = T2.erOf(c), hints = [`Cada rectángulo es una tabla (singular). Además, una tabla por cada N:M${c.rels.some(r => r.ternary) ? ', por la ternaria' : ''}${er.entities.some(e => e.attrs.some(a => /m/.test(a[1]))) ? ' y por cada atributo multivalorado (doble óvalo)' : ''}. ${all ? 'En total ' + c.tables.length + ' tablas.' : ''}`,
+    'En una 1:N, la entidad cuyo par tiene máximo 1 es la que se referencia (lado "1"); la otra tabla lleva la FK. En una N:M, tabla intermedia con las dos FKs y CP compuesta (los atributos de la relación van ahí).',
+    'Nulos de la FK (existencia): mínimo 1 en el par de la entidad referenciada → NOT NULL; mínimo 0 → admite NULL. Óvalo con línea discontinua = atributo opcional (sin NOT NULL). Reflexiva: FK a la propia tabla.',
+    'Orden: crea primero las tablas a las que apuntan otras. Subrayado = clave primaria. Si el enunciado da un identificador natural (DNI, ISBN...), ese es la CP.'];
+  return {id: 'ddlw:' + c.id, part: 3, title: `DDL: desde el E/R · ${c.name}`, src: c.from, statement: `${diagram(c)}${textoPlegado(c)}<p>Pasa este E/R a tablas escribiendo los <b>CREATE TABLE</b> (solo DDL, sin consultas)${all ? '' : ' de estas tablas: ' + esc(names.join(', '))}. Tablas en singular y en el orden correcto. La sintaxis fina no es lo importante: cuentan claves, NOT NULL, UNIQUE y FK.</p>`, hints,
     solution: `<pre class="code">${esc(sol)}</pre><p class="small">Los tipos pueden variar: lo que se evalúa son claves, nulos, UNIQUE y FK.</p>`, rubric: rub};
 }
 function dmlResult(db, sql) {
@@ -3402,9 +3484,9 @@ function itemDmlR(t) {
 function itemDmlW(t) {
   const refs = [].concat(t.ref), hints = [...(t.hints || [])]; if (t.skeleton) hints.push(`Plantilla:<pre class="code">${esc(t.skeleton)}</pre>`);
   hints.unshift('Método: 1) ¿de qué tabla? 2) ¿qué filas (WHERE)? 3) ¿agrupo (GROUP BY / HAVING)? 4) ¿qué columnas o cálculos muestro? 5) ¿orden y LIMIT?');
-  return {id: 'dmlw:' + t.id, part: 4, title: `DML: desde cero · ${t.title}`, src: t.src, statement: `<p>${esc(t.prompt)}</p>${t.aliases ? `<p class="small">La columna debe llamarse <code>${esc(t.aliases.join(', '))}</code>.</p>` : ''}${dataViewer(t.db)}<p>Escribe la sentencia en el folio.</p>`, hints,
+  return {id: 'dmlw:' + t.id, part: 4, title: `DML: desde cero · ${t.title}`, src: t.src, statement: `<p>${esc(t.prompt)}</p>${dataViewer(t.db)}<p>Escribe la sentencia en el folio.</p>`, hints,
     solution: `${refs.map((r, i) => `<p>${refs.length > 1 ? 'Opción ' + (i + 1) + ':' : '<b>Solución:</b>'}</p><pre class="code">${esc(r.replace(/;\s*/g, ';\n'))}</pre>`).join('')}<div class="dres"><b>Resultado esperado</b>${dmlResult(t.db, refs[0])}</div>${explainSql(refs[0])}`,
-    rubric: ['Mi sentencia daría el mismo resultado (o equivalente)', 'Orden de cláusulas correcto y comillas/comas bien', ...(t.aliases ? ['Alias pedido: ' + esc(t.aliases.join(', '))] : [])]};
+    rubric: ['Mi sentencia daría el mismo resultado (o equivalente)', 'Orden de cláusulas correcto y comillas/comas bien']};
 }
 function itemDdls(t) { return {id: 'ddls:' + t.id, part: 3, title: `DDL: ${t.title}`, src: t.tags.join(' · '), statement: `<p>${t.q}</p><p>Escribe el DDL (solo CREATE TABLE / ALTER TABLE, sin consultas). Tablas en singular.</p>`, hints: t.hints, solution: `<pre class="code">${esc(t.sol)}</pre>`, rubric: t.rub}; }
 function itemNorm(t) { return {id: 'norm:' + t.id, part: 5, title: `Normalización · ${t.title}`, src: 'Boletín normalización', statement: `<p>${t.q}</p><p class="small">Notación DeMarco: <code>{ }</code> repetición · <code>[ ]</code> opcional · <code>( )</code> composición.</p>`, hints: t.hints, solution: t.sol, rubric: t.rub}; }
@@ -3418,7 +3500,7 @@ function paperSections() {
   const byLvl = ids => ids.map((id, i) => [id, paperMeta(id).level, i]).sort((x, y) => x[1] - y[1] || x[2] - y[2]).map(x => x[0]);
   return [
     {k: 'er', t: '1 · E/R (conceptual)', ids: erIds.map(i => 'er:' + i)},
-    {k: 'ddlw', t: '3 · DDL: escribir desde cero', ids: byLvl([...D.DDLS.map(t => 'ddls:' + t.id), ...withTables.filter(c => c.level === 1 || ddlNames(c, false).length).map(c => 'ddlw:' + c.id)])},
+    {k: 'ddlw', t: '3 · DDL: escribir desde cero', ids: byLvl([...D.DDLS.map(t => 'ddls:' + t.id), ...withTables.map(c => 'ddlw:' + c.id)])},
     {k: 'ddlv', t: '3 · DDL: validar y explicar el porqué (enunciado E/R + DDL de varias tablas)', ids: byLvl([...D.CASES.map(c => 'ddlv:' + c.id), ...withTables.map(c => 'ddlg:' + c.id)])},
     {k: 'dmlr', t: '3 · DML: revisar errores (de una tabla)', ids: byLvl(D.DMLR.map(t => 'dmlr:' + t.id))},
     {k: 'dmlw', t: '3 · DML: desde cero (de una tabla)', ids: byLvl(D.DMLW.map(t => 'dmlw:' + t.id))}];
@@ -3438,7 +3520,7 @@ function paperHome() {
   const secs = paperSections(), pc = save.paper || {};
   const dn = ids => ids.filter(i => pc[i] !== undefined).length;
   view(`<div class="crumb"><button class="ghost" onclick="BQA.home()">← Plan</button></div><section class="hero"><h1>✏️ Modo papel</h1>
-   <p>El examen es en papel: aquí lees, lo haces en el folio, y cuando acabes pulsas ✅ Corregir para ver la solución y marcar lo que tenías bien. Si te atascas: 💡 Pista (de una en una). Sale primero lo más simple (🟢) y después lo más denso (🔴). El examen: E/R · DDL (validar con campo libre y escribir desde cero, sin consultas) · DML de una tabla (5 sentencias con error + 1 desde cero).</p>
+   <p>El examen es en papel: aquí lees, lo haces en el folio, y cuando acabes pulsas ✅ Corregir para ver la solución y marcar lo que tenías bien. Si te atascas: 💡 Pista (de una en una). Sale primero lo más simple (🟢) y después lo más denso (🔴). En el examen te dan un <b>E/R dibujado</b>: de ahí sacas el paso a tablas <b>escribiendo los CREATE TABLE</b> (sin consultas), validas un DDL con campo libre y haces DML de una tabla (5 sentencias con error + 1 desde cero).</p>
    <div class="row big"><button class="primary" onclick="BQA.paperExam()">📝 Simulacro en papel (examen completo)</button></div>
    <div class="row"><button class="ghost" onclick="BQA.paperPrint('')">🖨 Imprimir un examen (enunciados)</button><button class="ghost" onclick="BQA.paperPrint('sol')">🖨 …con soluciones</button></div></section>
    ${secs.map(s => `<button class="ucard" style="width:100%" onclick="BQA.paperList('${s.k}')"><span class="uicon">✏</span><span class="uname">${esc(s.t)}</span><span class="usub">${s.ids.length} ejercicios</span><span class="ubadge">PAPEL</span><span class="upct">${dn(s.ids)}/${s.ids.length}</span></button>`).join('<div style="height:8px"></div>')}`);
@@ -3490,7 +3572,7 @@ function paperNext() {
    <div class="parts">${Object.keys(byPart).map(p => { const v = Math.round(byPart[p].reduce((a, b) => a + b, 0) / byPart[p].length); return `<div class="part"><b>${p == 5 ? 'Norm.' : 'Parte ' + p}</b><strong>${v}%</strong><i style="width:${v}%"></i></div>`; }).join('')}</div>
    <p class="small">Tu nota de cada ejercicio queda guardada en el listado.</p><div class="row big"><button class="primary" onclick="BQA.paper()">Modo papel</button><button onclick="BQA.home()">Plan</button></div></section>`);
 }
-function examIds(c) { return [`er:${c.id}`, `ddlg:${c.id}`, `ddlw:${c.id}`, ...shuffle(D.DMLR.filter(t => dmlLevel(t) <= 2)).slice(0, 5).map(t => 'dmlr:' + t.id), 'dmlw:' + pick(D.DMLW.filter(t => dmlLevel(t) <= 2)).id]; }
+function examIds(c) { return [`er:${c.id}`, `ddlg:${c.id}`, `ddlw:${c.id}`, ...shuffle(D.DMLR.filter(t => !t.noExam && dmlLevel(t) <= 3)).slice(0, 5).map(t => 'dmlr:' + t.id), 'dmlw:' + pick(D.DMLW.filter(t => dmlLevel(t) <= 3)).id]; }
 const examPool = () => ALLC().filter(c => c.tables && (c.level || 2) <= 2 && c.id !== 'huertoex');
 function paperExam(caseId) {
   const c = caseId ? caseAny(caseId) : pick(examPool());
@@ -3638,7 +3720,7 @@ function caseParts(c){
   const keyTables = cq('keys').sort((a,b) => c.tables.indexOf(a.table)-c.tables.indexOf(b.table));
   const p2 = [...shuffle(keyTables).slice(0,3).sort((a,b) => c.tables.indexOf(a.table)-c.tables.indexOf(b.table)), byId(`assert:${c.id}`)];
   const p3 = [byId(`ddl:${c.id}`), byId(`ddlw:${c.id}`)];
-  const p4 = [...shuffle(D.DMLR).slice(0,5).map(t => byId('dmlr:'+t.id)), byId('dmlw:'+pick(D.DMLW).id)];
+  const p4 = [...shuffle(D.DMLR.filter(t => !t.noExam)).slice(0,5).map(t => byId('dmlr:'+t.id)), byId('dmlw:'+pick(D.DMLW).id)];
   return {1:p1, 2:p2, 3:p3, 4:p4, keyTables};
 }
 function exam(caseId){

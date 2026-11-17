@@ -233,7 +233,7 @@ function checkDmlr(q) {
 }
 function renderDmlw(q) {
   const t = q.t; st.hint = 0;
-  return `${dmlCommon(t)}${t.aliases ? `<p class="small">La columna debe llamarse <code>${esc(t.aliases.join(', '))}</code>.</p>` : ''}
+  return `${dmlCommon(t)}
   <div class="row"><button class="ghost" onclick="BQA.dmlHint()" id="dmlHintBtn">💡 Pista (0/${(t.hints || []).length})</button>${t.skeleton ? '<button class="ghost" onclick="BQA.dmlSkel()">🧩 Plantilla</button>' : ''}</div><div id="dmlHints"></div>
   <textarea id="dmlIn" class="editor" rows="6" spellcheck="false" placeholder="Escribe aquí tu sentencia SQL…">${esc(st.typed || '')}</textarea><p class="small">Se corrige <b>ejecutándola</b> sobre los datos y comparando el resultado con el de la solución.</p>`;
 }
@@ -270,6 +270,46 @@ T2.erSvg = function (c) {
   ents.forEach(e => { s += box(pos[e][0], pos[e][1], e); });
   return s + '</svg>';
 };
+
+
+// ---------- dibujo del E/R COMPLETO (con atributos), como en el examen ----------
+T2.erSvgFull = function (c) {
+  const er = T2.erOf(c), attrsOf = n => { const e = er.entities.find(x => sameName(x.n, n)); return e ? e.attrs : []; };
+  const names = [...new Set(c.rels.flatMap(r => r.ternary ? r.ternary.map(x => x.e) : [r.a, r.b]))];
+  const N = names.length, big = N > 4, W = big ? 1240 : 1000, H = big ? 800 : 640, cx = W / 2, cy = H / 2, rx = W * (N <= 2 ? .28 : .33), ry = H * (N <= 2 ? .1 : .31), pos = {};
+  names.forEach((e, i) => { const a = N === 1 ? 0 : (i / N) * Math.PI * 2 - Math.PI / 2 + (N === 2 ? Math.PI / 2 : 0); pos[e] = [cx + rx * Math.cos(a), cy + ry * Math.sin(a), a]; });
+  let lines = '', shapes = '';
+  const tw = t => Math.max(54, 6.6 * String(t).length + 18);
+  const ent = (x, y, t) => `<rect x="${x - 48}" y="${y - 16}" width="96" height="32" fill="#fff" stroke="#111" stroke-width="2"/><text x="${x}" y="${y + 5}" text-anchor="middle" font-size="14" font-weight="700" fill="#111">${esc(t)}</text>`;
+  const rhomb = (x, y, t) => `<polygon points="${x},${y - 20} ${x + Math.max(48, 3.6 * t.length + 14)},${y} ${x},${y + 20} ${x - Math.max(48, 3.6 * t.length + 14)},${y}" fill="#fff" stroke="#111" stroke-width="2"/><text x="${x}" y="${y + 4}" text-anchor="middle" font-size="11" fill="#111">${esc(t)}</text>`;
+  const attr = (x, y, a, dashed) => { const f = a[1] || '', w = tw(a[0]), id = /I/.test(f), part = /p/.test(f), multi = /m/.test(f);
+    lines += `<line x1="${x}" y1="${y}" x2="${a._ex}" y2="${a._ey}" stroke="#111" stroke-width="1.3" ${/o/.test(f) ? 'stroke-dasharray="5 4"' : ''}/>`;
+    return `${multi ? `<ellipse cx="${x}" cy="${y}" rx="${w / 2 + 5}" ry="19" fill="#fff" stroke="#111" stroke-width="1.3"/>` : ''}<ellipse cx="${x}" cy="${y}" rx="${w / 2}" ry="${multi ? 15 : 14}" fill="#fff" stroke="#111" stroke-width="1.3"/><text x="${x}" y="${y + 4}" text-anchor="middle" font-size="11" fill="#111" ${id ? 'font-weight="700" text-decoration="underline"' : ''} ${part ? 'text-decoration="underline" style="text-decoration-style:dashed"' : ''}>${esc(a[0])}</text>`; };
+  // relaciones
+  const pairCount = {};
+  c.rels.forEach(r => {
+    const key = r.ternary ? null : [r.a, r.b].sort().join('|'); if (key) pairCount[key] = (pairCount[key] || 0) + 1; const off = key ? (pairCount[key] - 1) * 56 : 0;
+    const lab = (x1, y1, x2, y2, t, dx = 0) => `<text x="${x1 + (x2 - x1) * .27 + dx}" y="${y1 + (y2 - y1) * .27 - 6}" text-anchor="middle" font-size="12" font-weight="700" fill="#b02a2a">${esc(t)}</text>`;
+    let mx, my;
+    if (r.ternary) { const pts = r.ternary.map(x => pos[x.e]); mx = pts.reduce((a, p) => a + p[0], 0) / 3; my = pts.reduce((a, p) => a + p[1], 0) / 3;
+      r.ternary.forEach((x, i) => { lines += `<line x1="${pts[i][0]}" y1="${pts[i][1]}" x2="${mx}" y2="${my}" stroke="#111" stroke-width="1.6"/>`; shapes += lab(pts[i][0], pts[i][1], mx, my, fp2(x.m)); }); }
+    else if (r.a === r.b) { const [x, y, a0] = pos[r.a], a = a0 + Math.PI, ox = Math.cos(a) * 110, oy = Math.sin(a) * 110; mx = x + ox; my = y + oy;
+      lines += `<line x1="${x}" y1="${y}" x2="${mx}" y2="${my}" stroke="#111" stroke-width="1.6"/>`; lines += `<path d="M ${x + 30} ${y + 12} Q ${mx + 70 * Math.sin(a)} ${my - 70 * Math.cos(a)} ${mx} ${my}" fill="none" stroke="#111" stroke-width="1.6"/>`;
+      shapes += `<text x="${x + 54 * Math.cos(a) + 18}" y="${y + 54 * Math.sin(a) - 8}" font-size="11" font-weight="700" fill="#b02a2a">${fp2(r.na)} ${esc(r.roles ? r.roles.a : '')}</text><text x="${x + 54 * Math.cos(a) + 18}" y="${y + 54 * Math.sin(a) + 16}" font-size="11" font-weight="700" fill="#b02a2a">${fp2(r.nb)} ${esc(r.roles ? r.roles.b : '')}</text>`; }
+    else { const [x1, y1] = pos[r.a], [x2, y2] = pos[r.b]; const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1; mx = (x1 + x2) / 2 - dy / L * off; my = (y1 + y2) / 2 + dx / L * off;
+      lines += `<line x1="${x1}" y1="${y1}" x2="${mx}" y2="${my}" stroke="#111" stroke-width="1.6"/><line x1="${mx}" y1="${my}" x2="${x2}" y2="${y2}" stroke="#111" stroke-width="1.6"/>`;
+      shapes += lab(x1, y1, mx, my, fp2(r.na)) + lab(x2, y2, mx, my, fp2(r.nb)); }
+    shapes += rhomb(mx, my, r.verb);
+    String(r.attr || '').split(',').map(x => x.trim()).filter(Boolean).forEach((an, i) => { const ax = mx + 20 + i * 8, ay = my - 62 - i * 30; lines += `<line x1="${mx}" y1="${my - 20}" x2="${ax}" y2="${ay + 14}" stroke="#111" stroke-width="1.3"/>`; shapes += `<ellipse cx="${ax}" cy="${ay}" rx="${tw(an) / 2}" ry="14" fill="#fff" stroke="#111" stroke-width="1.3"/><text x="${ax}" y="${ay + 4}" text-anchor="middle" font-size="11" fill="#111">${esc(an)}</text>`; });
+  });
+  // entidades y atributos
+  names.forEach(n => { const [x, y, a] = pos[n], at = attrsOf(n), k = at.length;
+    const out = N === 1 ? -Math.PI / 2 : a, spread = Math.min(2.7, .62 * Math.max(1, k - 1)), R = 82 + 7 * k;
+    at.forEach((q, i) => { const ang = k === 1 ? out : out - spread / 2 + spread * i / (k - 1), ax = x + R * Math.cos(ang), ay = y + R * Math.sin(ang) * .78; q._ex = x + 48 * Math.cos(ang) * .9; q._ey = y + 16 * Math.sin(ang) * 1.1; shapes += attr(ax, ay, q); });
+    shapes += ent(x, y, n); });
+  return `<div class="svgwrap"><svg viewBox="0 0 ${W} ${H}" class="ersvg" style="min-width:${big ? 900 : 720}px" role="img" aria-label="E/R de ${esc(c.name)}"><rect width="${W}" height="${H}" fill="#fff"/>${lines}${shapes}</svg></div>`;
+};
+const fp2 = p => `(${p[0]},${p[1]})`;
 
 window.T2 = T2;
 Object.assign(T2, {renderEnts, checkEnts, renderAttrs, checkAttrs, renderCard, checkCard, renderAssert, checkAssert, renderDdlw, checkDdlw, renderDmlr, checkDmlr, renderDmlw, checkDmlw});

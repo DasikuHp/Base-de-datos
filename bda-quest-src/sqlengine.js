@@ -60,6 +60,11 @@ SQL.typoHint = typoHint;
 // ---------- parser de expresiones ----------
 const AGGS = new Set(['COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'GROUP_CONCAT']);
 const CLAUSE_END = new Set(['FROM', 'WHERE', 'GROUP', 'HAVING', 'ORDER', 'LIMIT', 'UNION', 'SET', 'VALUES', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'CROSS', 'ON', 'ASC', 'DESC', 'OFFSET']);
+function collectParen(p) {   // tras '(' : devuelve los tokens hasta el ')' que lo cierra (y lo consume)
+  const toks = []; let d = 1;
+  while (!p.done) { const x = p.next(); if (x.t === 'p' && x.v === '(') d++; if (x.t === 'p' && x.v === ')') { d--; if (!d) return toks; } toks.push(x); }
+  throw new SqlError('Falta cerrar el paréntesis de la subconsulta');
+}
 class ExprParser {
   constructor(rd) { this.p = rd; }
   expr() { return this.or(); }
@@ -83,7 +88,7 @@ class ExprParser {
       if (p.isW('LIKE')) { p.next(); const pat = this.add(); if (p.eatW('ESCAPE')) p.next(); a = {k: 'like', a, pat, neg}; continue; }
       if (p.isW('REGEXP') || p.isW('RLIKE')) { p.next(); const pat = this.add(); a = {k: 'regexp', a, pat, neg}; continue; }
       if (p.isW('IN')) { p.next(); p.expectP('(', 'tras IN');
-        if (p.isW('SELECT')) throw new SqlError('Las subconsultas no entran en esta parte (solo una tabla)');
+        if (p.isW('SELECT')) { a = {k: 'insub', a, toks: collectParen(p), neg}; continue; }
         const list = []; for (;;) { list.push(this.expr()); if (p.eatP(',')) continue; break; } p.expectP(')', 'al cerrar la lista de IN'); a = {k: 'in', a, list, neg}; continue; }
       if (p.isW('BETWEEN')) { p.next(); const lo = this.add(); if (!p.eatW('AND')) throw new SqlError('BETWEEN necesita AND: BETWEEN 20 AND 30', p.peek()?.pos); const hi = this.add(); a = {k: 'between', a, lo, hi, neg}; continue; }
       p.i = save; break;
@@ -97,7 +102,7 @@ class ExprParser {
     const p = this.p, x = p.next(); if (!x) throw new SqlError('La expresión está incompleta: falta un valor al final');
     if (x.t === 'n') return {k: 'lit', v: parseFloat(x.v)};
     if (x.t === 's') return {k: 'lit', v: x.v, str: true};
-    if (x.t === 'p' && x.v === '(') { if (p.isW('SELECT')) throw new SqlError('Las subconsultas no entran en esta parte (solo una tabla)'); const e = this.expr(); p.expectP(')', 'al cerrar el paréntesis'); return e; }
+    if (x.t === 'p' && x.v === '(') { if (p.isW('SELECT')) return {k: 'sub', toks: collectParen(p)}; const e = this.expr(); p.expectP(')', 'al cerrar el paréntesis'); return e; }
     if (x.t === 'p') throw new SqlError(`No se esperaba '${x.v}' aquí`, x.pos);
     if (x.t === 'w') {
       const u = x.u;
@@ -166,6 +171,8 @@ function ev(n, cx) {
       for (const [c, r] of n.whens) { const hit = n.operand ? cmpVals(op, ev(c, cx)) === 0 : bool3(ev(c, cx)) === true; if (hit) return ev(r, cx); }
       return n.els ? ev(n.els, cx) : null; }
     case 'agg': return cx.agg(n);
+    case 'sub': { const r = cx.eng.select(new Rd(n.toks)); if (r.cols.length !== 1) throw new SqlError('La subconsulta debe devolver UNA sola columna'); if (r.rows.length > 1) throw new SqlError('La subconsulta devuelve más de una fila y aquí se espera un único valor (usa IN, o un agregado como MIN/MAX/AVG)'); return r.rows.length ? r.rows[0][0] : null; }
+    case 'insub': { const v = ev(n.a, cx); const r = cx.eng.select(new Rd(n.toks)); if (r.cols.length !== 1) throw new SqlError('La subconsulta de IN debe devolver UNA sola columna'); if (v === null) return null; let seenNull = false, hit = false; for (const row of r.rows) { const c = cmpVals(v, row[0]); if (c === null) seenNull = true; else if (c === 0) { hit = true; break; } } if (hit) return b2n(!n.neg); if (seenNull) return null; return b2n(n.neg); }
     case 'fn': return callFn(n, cx);
   }
   throw new SqlError('Expresión no soportada');
@@ -292,7 +299,7 @@ class Engine {
   // ---- contexto de evaluación ----
   mkCx(t, rowObj, opts) {
     const cx = {
-      row: rowObj, grp: null, where: opts.where, aliases: opts.aliases || null, tname: t.name, talias: opts.talias, noAgg: opts.noAgg, strictGroup: opts.strictGroup,
+      eng: this, row: rowObj, grp: null, where: opts.where, aliases: opts.aliases || null, tname: t.name, talias: opts.talias, noAgg: opts.noAgg, strictGroup: opts.strictGroup,
       col(n) {
         if (n.tbl && ![lc(t.name), lc(opts.talias || '')].includes(lc(n.tbl))) throw new SqlError(`La tabla '${n.tbl}' no está en el FROM (Unknown table)`);
         const k = lc(n.name);
@@ -363,7 +370,7 @@ class Engine {
       // ONLY_FULL_GROUP_BY
       const gcols = new Set(gExprs.filter(g => g.k === 'col').map(g => lc(g.name)));
       const pkCovered = t.pk.length && t.pk.every(c => gcols.has(lc(c)));
-      const bare = (node, label) => { if (!node || pkCovered) return; (function w(n, inAgg) { if (!n) return; if (n.k === 'agg') return; if (n.k === 'col' && !(aliases.has(lc(n.name)) && !t.cols.some(c => lc(c.name) === lc(n.name)))) { if (!gcols.has(lc(n.name))) throw new SqlError(`'${n.name}' aparece en ${label} sin función de agregado y no está en el GROUP BY (MySQL: only_full_group_by). Con GROUP BY, el SELECT solo puede llevar las columnas agrupadas y funciones como COUNT/SUM/AVG/MIN/MAX.`); }
+      const bare = (node, label) => { if (!node || pkCovered) return; (function w(n, inAgg) { if (!n) return; if (n.k === 'agg') return; if (n.k === 'col' && !(aliases.has(lc(n.name)) && !t.cols.some(c => lc(c.name) === lc(n.name)))) { if (!gcols.has(lc(n.name))) throw new SqlError(groupBy.length ? `'${n.name}' aparece en ${label} sin función de agregado y no está en el GROUP BY (MySQL: only_full_group_by). Con GROUP BY, el SELECT solo puede llevar las columnas agrupadas y funciones como COUNT/SUM/AVG/MIN/MAX.` : `No se puede mezclar la columna '${n.name}' con una función de agregado (MIN, MAX, COUNT...) sin GROUP BY: el agregado devuelve UNA fila resumen y no sabe a qué '${n.name}' corresponde. Si quieres los datos de la fila con el mínimo/máximo, hay que usar una SUBCONSULTA: WHERE columna = (SELECT MIN(columna) FROM ...).`); }
         ['a', 'b', 'lo', 'hi', 'pat', 'operand', 'els'].forEach(k => n[k] && w(n[k])); (n.args || []).forEach(x => w(x)); (n.list || []).forEach(x => w(x)); (n.whens || []).forEach(x => { w(x[0]); w(x[1]); }); })(node); };
       outItems.forEach((i, ix) => { if (!gExprs.some(g => JSON.stringify(g) === JSON.stringify(i.e))) bare(i.e, `el SELECT (columna ${ix + 1})`); });
       if (having) bare(resolveAlias(having), 'HAVING'); orderBy.forEach(o => { if (!(o.e.k === 'lit' && isNum(o.e.v))) bare(resolveAlias(o.e), 'ORDER BY'); });
@@ -523,7 +530,7 @@ function gradeDml(task, userSql, makeEngine) {
     for (const r of refs) { const er = makeEngine(task.db); const rr = er.execAll(r).pop(); res.ref = res.ref || rr; const ordered = task.ordered !== undefined ? task.ordered : rr.ordered;
       if (rr.cols.length === last.cols.length && sameRows(last.rows, rr.rows, ordered)) { best = rr; res.ref = rr; res.ok = true; break; } }
     if (res.ok) {
-      if (task.aliases) task.aliases.forEach((a, i) => { if (lc(last.cols[i] || '') !== lc(a)) { res.ok = false; res.msgs.push(`El resultado es correcto, pero la columna ${i + 1} debía llamarse «${a}» (alias con AS) y se llama «${last.cols[i] || '?'}».`); } });
+      // el alias no es obligatorio: no se corrige el nombre de las columnas
       return res;
     }
     const rr = res.ref;
