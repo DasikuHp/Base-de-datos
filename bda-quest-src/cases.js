@@ -282,93 +282,81 @@ CREATE TABLE linea (
   e5:{why:[['foreign','fk','c.aj','clave ajena','referenc','producto']], model:'<b>Falta la FK</b> <code>FOREIGN KEY (codigo_producto) REFERENCES producto(codigo)</code>: se podrían meter líneas de productos que no existen.'}
  }},
 
-{id:'taller', name:'Taller "El Tornillo Feliz"', from:'preparacion-examen/02-examen-practica.md (script corregido a fondo)',
+{id:'clinica', name:'Clínica dental "Sonrisa"', from:'Caso nuevo (claves naturales: DNI, nº de colegiado, código)',
  rules:[
-  'R1. De cada <b>cliente</b>: nombre, NIF (no puede repetirse), teléfono y fecha de alta. <b>Todo cliente tiene NIF</b>.',
-  'R2. De cada <b>vehículo</b>: matrícula (no puede repetirse), marca, modelo y año. Un vehículo pertenece <b>siempre a un único</b> cliente; un cliente puede tener varios vehículos.',
-  'R3. De cada <b>reparación</b>: número de orden interno, fecha de entrada y fecha de salida (puede no haber salido aún). Toda reparación es sobre <b>un único vehículo</b>; un vehículo puede tener muchas reparaciones.',
-  'R4. De cada <b>pieza</b>: código (no se repite), descripción, precio unitario y stock.',
-  'R5. Una reparación <b>utiliza</b> piezas y se guarda cuántas <b>unidades</b>. Una reparación puede no llevar ninguna pieza todavía y una pieza puede no haberse usado nunca; ambas pueden repetirse.',
-  'R6. De cada <b>mecánico</b>: nombre, DNI (no se repite), especialidad y sueldo. Cada reparación la dirige <b>exactamente un</b> mecánico; un mecánico puede no dirigir ninguna.',
-  'R7. Cada reparación tiene un número de orden (único) y también un identificador interno numérico.'],
+  'R1. De cada <b>paciente</b>: DNI (no puede repetirse y todo paciente lo tiene), nombre, teléfono y fecha de nacimiento (puede no constar).',
+  'R2. De cada <b>dentista</b>: número de colegiado (no se repite), nombre y especialidad (puede no tener).',
+  'R3. De cada <b>tratamiento</b>: código (no se repite), nombre y precio base.',
+  'R4. De cada <b>sala</b>: número (la identifica) y planta.',
+  'R5. De cada <b>cita</b>: un identificador interno numérico y la fecha y hora. Una cita la pide <b>un único paciente</b>, la atiende <b>un único dentista</b> y se hace en <b>una única sala</b>. Un paciente, un dentista o una sala pueden no tener citas todavía.',
+  'R6. En una cita se realizan tratamientos (ninguno, uno o varios): se anotan las <b>unidades</b> de cada tratamiento y el <b>precio aplicado</b>, que puede ser distinto del precio base. Un tratamiento puede no haberse realizado nunca.'],
  rels:[
-  {a:'Cliente', verb:'posee', b:'Vehículo', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R2: un vehículo pertenece siempre a un único cliente → (1,1) junto a Cliente. Un cliente puede tener varios (o ninguno) → (0,N) junto a Vehículo.'},
-  {a:'Vehículo', verb:'sobre', b:'Reparación', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R3: toda reparación es sobre un único vehículo → (1,1) junto a Vehículo. Un vehículo puede tener muchas reparaciones o ninguna → (0,N) junto a Reparación.'},
-  {a:'Mecánico', verb:'dirige', b:'Reparación', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R6: exactamente un mecánico por reparación → (1,1) junto a Mecánico. Un mecánico puede no dirigir ninguna → (0,N) junto a Reparación.'},
-  {a:'Reparación', verb:'utiliza', b:'Pieza', na:['0','N'], nb:['0','N'], tipo:'N:M', attr:'unidades', why:'R5: las dos pueden ser 0 y repetirse → (0,N) en ambos lados, N:M con el atributo unidades.'}],
+  {a:'Paciente', verb:'pide', b:'Cita', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R5: cada cita la pide un único paciente → (1,1) junto a Paciente. Un paciente puede no tener citas → (0,N) junto a Cita.'},
+  {a:'Dentista', verb:'atiende', b:'Cita', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R5: cada cita la atiende un único dentista → (1,1) junto a Dentista. Un dentista puede no haber atendido ninguna todavía → (0,N) junto a Cita.'},
+  {a:'Sala', verb:'acoge', b:'Cita', na:['1','1'], nb:['0','N'], tipo:'1:N', why:'R5: cada cita es en una única sala → (1,1) junto a Sala. Una sala puede no usarse → (0,N) junto a Cita.'},
+  {a:'Cita', verb:'incluye', b:'Tratamiento', na:['0','N'], nb:['0','N'], tipo:'N:M', attr:'unidades, precio_aplicado', why:'R6: una cita puede no llevar tratamientos o llevar varios, y un tratamiento puede no haberse realizado nunca → (0,N) en ambos lados. N:M con unidades y precio_aplicado.'}],
  tables:[
-  {name:'CLIENTE', cols:[['id','P'],['nif','AV'],['nombre',''],['telefono',''],['fecha_alta','']]},
-  {name:'VEHICULO', cols:[['id','P'],['matricula','A'],['marca',''],['modelo',''],['anio',''],['cliente_id','V','CLIENTE']]},
-  {name:'REPARACION', cols:[['id','P'],['numero_orden','A'],['fecha_entrada',''],['fecha_salida','o'],['vehiculo_id','V','VEHICULO'],['mecanico_id','V','MECANICO']]},
-  {name:'MECANICO', cols:[['id','P'],['dni','A'],['nombre',''],['especialidad',''],['sueldo','']]},
-  {name:'PIEZA', cols:[['codigo','P'],['descripcion',''],['precio_ud',''],['stock','']]},
-  {name:'REPARACION_PIEZA', cols:[['reparacion_id','P','REPARACION'],['pieza_codigo','P','PIEZA'],['unidades','V']]}],
- ddl:`CREATE TABLE cliente (
-  id            INT AUTO_INCREMENT,
-  nombre        VARCHAR(80) NOT NULL,
-  nif           CHAR(9), ⟦e1⟧
-  telefono      VARCHAR(15),
-  fecha_alta    DATE,
-  PRIMARY KEY (id)
+  {name:'PACIENTE', cols:[['dni','P'],['nombre','V'],['telefono',''],['fecha_nacimiento','o']], note:'El DNI no se repite y todo paciente lo tiene: es el identificador (CP). El enunciado no da ningún id interno del paciente.'},
+  {name:'DENTISTA', cols:[['num_colegiado','P'],['nombre','V'],['especialidad','o']], note:'El número de colegiado no se repite: es la CP. La especialidad puede no existir → admite NULL.'},
+  {name:'TRATAMIENTO', cols:[['codigo','P'],['nombre','V'],['precio_base','V']]},
+  {name:'SALA', cols:[['num_sala','P'],['planta','V']]},
+  {name:'CITA', cols:[['id_cita','P'],['fecha_hora','V'],['dni_paciente','V','PACIENTE'],['num_colegiado','V','DENTISTA'],['num_sala','V','SALA']], note:'R5: la cita SÍ tiene identificador interno (CP). Las tres FKs son VNN: la cita siempre tiene un único paciente, dentista y sala.'},
+  {name:'CITA_TRATAMIENTO', cols:[['id_cita','P','CITA'],['codigo_tratamiento','P','TRATAMIENTO'],['unidades','V'],['precio_aplicado','V']], note:'N:M → tabla intermedia con CP compuesta por las dos FKs; unidades y precio_aplicado son los atributos de la relación.'}],
+ ddl:`CREATE TABLE dentista (
+  num_colegiado  INT PRIMARY KEY,
+  nombre         VARCHAR(80) NOT NULL,
+  especialidad   VARCHAR(40),
+  PRIMARY KEY (num_colegiado) ⟦e3⟧
 );
 
-CREATE TABLE vehiculo (
-  id           INT AUTO_INCREMENT PRIMARY KEY, ⟦e2~⟧
-  matricula    CHAR(7), ⟦e3⟧
-  marca        VARCHAR(40) NOT NULL,
-  modelo       VARCHAR(40) NOT NULL,
-  anio         INT,
-  cliente_id   INT, ⟦e4⟧
-  PRIMARY KEY (id) ⟦e2⟧
+CREATE TABLE sala (
+  num_sala  INT PRIMARY KEY,
+  planta    SMALLINT NOT NULL
 );
 
-CREATE TABLE reparacion (
-  id            INT AUTO_INCREMENT PRIMARY KEY, ⟦e5~⟧
-  numero_orden  VARCHAR(10) NOT NULL, ⟦e6⟧
-  fecha_entrada DATE,
-  fecha_salida  DATE,
-  vehiculo_id   INT NOT NULL,
-  mecanico_id   INT, ⟦e7⟧
-  PRIMARY KEY (id) ⟦e5⟧
+CREATE TABLE tratamiento (
+  codigo       VARCHAR(10) PRIMARY KEY,
+  nombre       VARCHAR(80) NOT NULL,
+  precio_base  DECIMAL(8,2) NOT NULL
 );
 
-CREATE TABLE mecanico (
-  id            INT AUTO_INCREMENT PRIMARY KEY,
-  dni           CHAR(9) NOT NULL, ⟦e8⟧
-  nombre        VARCHAR(80) NOT NULL,
-  especialidad  VARCHAR(40),
-  sueldo        DECIMAL(8,2)
+CREATE TABLE cita (
+  id_cita        INT AUTO_INCREMENT PRIMARY KEY,
+  fecha_hora     DATETIME NOT NULL,
+  dni_paciente   CHAR(9), ⟦e5⟧
+  num_colegiado  INT NOT NULL, ⟦e6⟧
+  num_sala       VARCHAR(5) NOT NULL, ⟦e4⟧
+  FOREIGN KEY (dni_paciente) REFERENCES paciente(dni), ⟦e7⟧
+  FOREIGN KEY (num_sala) REFERENCES sala(num_sala)
 );
 
-CREATE TABLE pieza (
-  codigo       VARCHAR(10), ⟦e9⟧
-  descripcion  VARCHAR(100) NOT NULL,
-  precio_ud    DECIMAL(8,2) NOT NULL,
-  stock        INT NOT NULL
-); ⟦e9~⟧
+CREATE TABLE paciente (
+  dni               CHAR(9) NOT NULL, ⟦e1⟧
+  nombre            VARCHAR(80) NOT NULL,
+  telefono          VARCHAR(15),
+  fecha_nacimiento  DATE NOT NULL ⟦e2⟧
+);
 
-CREATE TABLE reparacion_pieza (
-  reparacion_id INT NOT NULL,
-  pieza_id      INT NOT NULL, ⟦e10⟧
-  unidades      INT NOT NULL,
-  PRIMARY KEY (reparacion_id) ⟦e11⟧
-); ⟦e12⟧
+CREATE TABLE cita_tratamiento (
+  id_cita             INT NOT NULL,
+  codigo_tratamiento  VARCHAR(10) NOT NULL,
+  unidades            INT NOT NULL,
+  precio_aplicado     DECIMAL(8,2) NOT NULL,
+  PRIMARY KEY (id_cita), ⟦e8⟧
+  FOREIGN KEY (id_cita) REFERENCES cita(id_cita)
+);
 
-ALTER TABLE reparacion
-  ADD FOREIGN KEY (vehiculo_id) REFERENCES pieza(id); ⟦e13⟧`,
+ALTER TABLE cita_tratamiento
+  ADD FOREIGN KEY (codigo_tratamiento) REFERENCES dentista(num_colegiado); ⟦e9⟧`,
  errors:{
-  e1:{why:[['unique','c.alt','repet'],['not null','vnn','obligatori','nulo','null','todo cliente']], model:'R1: el NIF no puede repetirse y todo cliente lo tiene → le faltan <b>UNIQUE</b> (C.Alt) y <b>NOT NULL</b> (VNN).'},
-  e2:{why:[['dos','doble','repet','ya','segunda','duplic','multiple']], model:'<b>PRIMARY KEY dos veces</b>: <code>id</code> ya la lleva en su línea y se vuelve a declarar al final. Una tabla tiene una sola clave primaria (error "Multiple primary key defined").'},
-  e3:{why:[['unique','c.alt','repet','alternativa']], model:'R2: la matrícula no puede repetirse → falta <b>UNIQUE</b> (C.Alt).'},
-  e4:{why:[['foreign','fk','c.aj','referenc','clave ajena','not null','null','vnn','obligatori']], model:'<code>cliente_id</code> no tiene <b>FOREIGN KEY</b> hacia <code>cliente(id)</code> y debe ser <b>NOT NULL</b> (R2: "pertenece siempre a un único cliente").'},
-  e5:{why:[['dos','doble','repet','ya','segunda','duplic','multiple']], model:'Igual que en vehículo: <b>PRIMARY KEY declarada dos veces</b> sobre <code>id</code>.'},
-  e6:{why:[['unique','c.alt','repet','unico','alternativa']], model:'R7: el número de orden es <b>único</b> → falta <b>UNIQUE</b> (C.Alt). El NOT NULL solo no evita duplicados.'},
-  e7:{why:[['not null','vnn','obligatori','null','nulo','foreign','fk','referenc']], model:'R6: exactamente un mecánico dirige cada reparación → <code>mecanico_id</code> debe ser <b>NOT NULL</b> y tener su <b>FOREIGN KEY</b> hacia <code>mecanico(id)</code>, que no aparece en el script.'},
-  e8:{why:[['unique','c.alt','repet','alternativa']], model:'R6: el DNI del mecánico no se repite → falta <b>UNIQUE</b> (C.Alt).'},
-  e9:{why:[['primary','pk','clave primaria','cp']], model:'<b>PIEZA no tiene clave primaria</b>: el código la identifica (R4) → <code>codigo VARCHAR(10) PRIMARY KEY</code>.'},
-  e10:{why:[['codigo','tipo','varchar','no existe','id']], model:'La pieza se identifica por <code>codigo VARCHAR(10)</code>, no por un <code>id</code> INT (PIEZA no tiene id) → debe ser <code>pieza_codigo VARCHAR(10) NOT NULL</code>.'},
-  e11:{why:[['compuesta','las dos','ambas','pieza','falta','solo un','un solo']], model:'CP de la N:M incompleta: debe ser <b>compuesta</b> <code>(reparacion_id, pieza_codigo)</code>. Así, cada reparación solo podría usar una pieza.'},
-  e12:{why:[['foreign','fk','c.aj','referenc','clave ajena']], model:'La tabla intermedia <b>no tiene ninguna FK</b>: faltan <code>FOREIGN KEY (reparacion_id) REFERENCES reparacion(id)</code> y <code>FOREIGN KEY (pieza_codigo) REFERENCES pieza(codigo)</code>.'},
-  e13:{why:[['vehiculo','tabla equivocada','otra tabla','pieza','no existe']], model:'La FK <code>vehiculo_id</code> apunta a <b>la tabla equivocada</b>: debe ser <code>REFERENCES vehiculo(id)</code>. Además <code>pieza</code> no tiene columna <code>id</code>.'}
+  e1:{why:[['primary','pk','clave primaria','cp','identifica','dni']], model:'<b>PACIENTE no tiene clave primaria</b>: el DNI no se repite y todo paciente lo tiene, y no hay otro identificador → <code>dni CHAR(9) PRIMARY KEY</code>. No hace falta inventar un id.'},
+  e2:{why:[['null','nulo','opcional','puede no','obligatori','constar','nacimiento']], model:'R1: la fecha de nacimiento <b>puede no constar</b> → <code>fecha_nacimiento</code> debe <b>admitir NULL</b>. El NOT NULL impide dar de alta a un paciente sin ese dato.'},
+  e3:{why:[['dos','doble','repet','ya','segunda','duplic','multiple']], model:'<b>PRIMARY KEY dos veces</b> sobre <code>num_colegiado</code>: ya la lleva en su línea. Una tabla tiene una sola clave primaria (Multiple primary key defined).'},
+  e4:{why:[['tipo','int','varchar','coincid','distinto','mismo','sala']], model:'<b>Tipos incompatibles</b>: <code>cita.num_sala</code> es VARCHAR(5) y apunta a <code>sala.num_sala</code>, que es INT. La FK y la columna referenciada deben tener el mismo tipo.'},
+  e5:{why:[['not null','vnn','nulo','null','obligatori','un unico','paciente']], model:'R5: cada cita la pide <b>un único paciente</b> → <code>dni_paciente</code> debe ser <b>NOT NULL</b>.'},
+  e6:{why:[['foreign','fk','c.aj','clave ajena','referenc','dentista','falta']], model:'<b>Falta la FK</b> <code>FOREIGN KEY (num_colegiado) REFERENCES dentista(num_colegiado)</code>: se podrían crear citas con dentistas que no existen.'},
+  e7:{why:[['orden','no existe','antes','todavia','aun no','despues','primero','se crea']], model:'<b>Orden de creación</b>: la FK de <code>cita</code> apunta a <code>paciente</code>, que se crea <b>después</b>. Al ejecutar ese CREATE la tabla referenciada no existe. Hay que crear <code>paciente</code> antes (y con su PRIMARY KEY, porque una FK solo apunta a una clave).'},
+  e8:{why:[['compuesta','codigo_tratamiento','las dos','ambas','falta','solo un','un solo']], model:'CP de la N:M incompleta: debe ser <b>compuesta</b> <code>(id_cita, codigo_tratamiento)</code>. Con solo <code>id_cita</code>, cada cita llevaría un único tratamiento.'},
+  e9:{why:[['tratamiento','tabla equivocada','otra tabla','dentista','no corresponde','tipo']], model:'La FK de <code>codigo_tratamiento</code> apunta a <b>la tabla equivocada</b> (<code>dentista(num_colegiado)</code>): debe ser <code>REFERENCES tratamiento(codigo)</code>.'}
  }}
 ];

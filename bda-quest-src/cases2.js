@@ -17,7 +17,7 @@ A('huerto', []);
 A('ciclismo', [{t:'EQUIPO[nomeq] ⊆ CICLISTA[nomeq]', why:'R2: "un equipo tiene al menos un ciclista" → mínimo 1 en el lado N. La FK va en CICLISTA, así que no basta: hay que exigir que todo equipo aparezca en CICLISTA.'}]);
 A('hospital', [{t:'DOCTOR[num_colegiado] ⊆ CONSULTA[num_colegiado]', why:'R5: "todos los doctores están dando consultas" → mínimo 1: todo doctor debe aparecer en CONSULTA.'}]);
 A('tienda', [{t:'PEDIDO[numero] ⊆ LINEA[numero_pedido]', why:'R5: "un pedido contiene al menos un producto" → todo pedido aparece en la tabla intermedia LINEA.'}]);
-A('taller', []);
+A('clinica', []);
 
 C.push(
 
