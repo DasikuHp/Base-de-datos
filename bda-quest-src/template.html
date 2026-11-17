@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#11102b">
-<title>BDA-QUEST · Bases de Datos</title>
+<title>/*TITLE*/</title>
 <style>
 :root{--ink:#100e29;--panel:#24204b;--panel2:#30285e;--line:#8068d7;--cyan:#5de8ed;--pink:#ee77cb;--gold:#ffd36e;--green:#64e3a2;--red:#ff7187;--text:#f2eeff;--muted:#bdb6e1;--shadow:0 4px 0 #09081b,0 8px 20px #0008}
 *{box-sizing:border-box}html,body{margin:0}
@@ -84,14 +84,17 @@ label.small{display:block;margin:8px 0 2px}
 h4{color:var(--cyan);margin:12px 0 4px}.printsheet .pitem{border-top:2px solid #514a91;margin-top:14px;padding-top:6px}.printsheet .lines{height:160px;border:1px dashed #8f89c4;margin:8px 0}
 @media print{.statement{background:#fff;border:1px solid #999;color:#000}.pitem{break-inside:avoid-page}.psol{background:#f4f4f4;padding:6px}.code{background:#f4f4f4!important;color:#000!important}.hero,.qcard{background:#fff!important;border:0!important;color:#000}h4{color:#000}}
 .svgwrap{overflow-x:auto;border:2px solid #514a91;background:#fff;margin:8px 0}.svgwrap .ersvg{display:block;border:0;margin:0;height:auto}
+.cmap{display:grid;gap:4px;margin:8px 0}.cl{display:grid;grid-template-columns:34px 92px 1fr auto;gap:8px;align-items:center;border-left:8px solid;background:#1b1940;padding:7px 10px}.cl .cn{color:var(--muted);font-size:13px}.cl .cq{font-size:14px}.cl .cr{font-size:12px;color:var(--muted);text-align:right}
+.colsql{line-height:1.7}select.fillsel{min-width:96px;font-weight:700}
+@media (max-width:600px){.cl{grid-template-columns:28px 80px 1fr}.cl .cr{display:none}}
 @media (max-width:600px){body{font-size:16px}.brand small{display:none}.hero h1{font-size:22px}.match label{grid-template-columns:1fr}.stat{min-width:48px;padding:2px 5px}.stat small{display:none}.dl .why{padding-left:10px}}
 @media print{header,.crumb{display:none}body{background:#fff;color:#000}.block{border:1px solid #999;box-shadow:none;background:#fff;break-inside:avoid}.truco{background:#f4f4f4}.block h3{color:#000}}
 </style>
 </head>
 <body>
 <header>
-  <button class="logo" onclick="BQA.home()" aria-label="Inicio"><span class="chip">▦</span><span class="brand">BDA-QUEST<small>Bases de Datos · 1º DAW</small></span></button>
-  <div class="stats"><div class="stat">⭐ <b id="xp">0</b><small>XP</small></div><div class="stat">LV <b id="lv">1</b><small>NIVEL</small></div><div class="stat">♥ <b id="st">0</b><small>RACHA</small></div><button id="failBtn" class="stat" onclick="BQA.review()" title="Repasar fallos">♻ <b id="failCount">0</b><small>FALLOS</small></button></div>
+  <button class="logo" onclick="BQA.home()" aria-label="Inicio"><span class="chip">▦</span><span class="brand">/*BRAND*/<small>Bases de Datos · 1º DAW</small></span></button>
+  <div class="stats"><div class="stat">⭐ <b id="xp">0</b><small>XP</small></div><div class="stat">LV <b id="lv">1</b><small>NIVEL</small></div><div class="stat">♥ <b id="st">0</b><small>RACHA</small></div><button id="failBtn" class="stat" style="/*FAILSTYLE*/" onclick="BQA.review()" title="Repasar fallos">♻ <b id="failCount">0</b><small>FALLOS</small></button></div>
 </header>
 <main id="main" tabindex="-1"></main>
 <script>/*DATA*/</script>

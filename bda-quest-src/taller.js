@@ -184,6 +184,7 @@ function dmlTallerHome() {
    <p>Para repasar <b>todo lo visto muy rápido</b> y después centrarte en <b>lo que entra en el examen</b>: una sola tabla, 5 sentencias con error para revisar + 1 para hacer desde cero.</p>
    <details class="rules"><summary>📋 Todo en 1 minuto (resumen exprés)</summary>${CHULETA.dml}</details>
    <details class="rules" open><summary>🎯 Qué entra en el examen (y qué no)</summary><ul class="plist"><li><b>Sí:</b> 5 sentencias para <b>revisar errores</b> (dejas la explicación en blanco y la rellenas) + 1 consulta <b>desde cero</b>. Siempre <b>una tabla</b>.</li><li><b>Sí:</b> funciones <b>anidadas</b>; WHERE antes de agrupar y HAVING después; <b>subconsulta</b> cuando MIN/MAX/AVG no se pueden mezclar con columnas.</li><li><b>El alias (AS) NO es obligatorio.</b> Lo de comodines (wildcards) no. XML, DTD y schema no.</li></ul></details>
+   <div class="stepnow"><span class="uicon">🧭</span><div><b>Empieza aquí: Paso 0 · dónde y cuándo va cada cláusula</b><br><span class="small">FROM, WHERE, GROUP BY, HAVING, ORDER BY y LIMIT, en 10 minutos y viendo el resultado en cada paso</span></div></div><div class="row big"><button class="primary" onclick="BQA.base()">🧭 Paso 0: la base</button></div>
    <div class="row big"><button class="primary" onclick="BQA.dmlDiag()">🩺 ¿Qué parte me falla? (diagnóstico, 5 min)</button><button onclick="BQA.dmlOpen(${nxt})">▶ ${n ? 'Seguir' : 'Empezar'} el repaso express (lección ${nxt + 1}/${DL.length})</button></div>
    <div class="row big"><button class="primary" onclick="BQA.dmlExam()">🎯 Simulacro DML del examen (5 con error + 1 desde cero)</button></div></section>
    <h2 class="sec">Repaso express (${n}/${DL.length})</h2><ol class="plan">${DL.map((l, i) => `<li class="${d[l.id] ? 'dn' : ''}"><button onclick="BQA.dmlOpen(${i})"><span>${d[l.id] ? '✔' : (weak.includes(l.tag) ? '🔥' : i + 1)}</span> ${esc(l.t)} <small>${weak.includes(l.tag) ? 'te cuesta' : l.tag}</small></button></li>`).join('')}</ol>`);
@@ -236,4 +237,203 @@ function dmlDiagCheck() {
 function dmlExam() {
   const rev = shuffle(D.DMLR.filter(t => !t.noExam)).slice(0, 5).map(t => byId('dmlr:' + t.id)), one = byId('dmlw:' + pick(D.DMLW.filter(t => dmlLevel(t) <= 3)).id);
   start([...rev, one], 'ronda', 'Simulacro DML del examen');
+}
+
+// =====================================================================================
+// PASO 0 DEL DML: la base — dónde y cuándo va cada cláusula
+// =====================================================================================
+const CLS = [
+ {k:'SELECT', q:'¿Qué columnas o cálculos MUESTRO?', ex:'nombre, edad', run:5, c:'#5de8ed'},
+ {k:'FROM', q:'¿De QUÉ TABLA salen los datos?', ex:'ciclista', run:1, c:'#64e3a2'},
+ {k:'WHERE', q:'¿Qué FILAS me quedo? (se decide ANTES de agrupar)', ex:'edad > 30', run:2, c:'#ffd36e'},
+ {k:'GROUP BY', q:'¿Cómo AGRUPO? (una fila por cada grupo)', ex:'nomeq', run:3, c:'#ee77cb'},
+ {k:'HAVING', q:'¿Qué GRUPOS me quedo? (se decide DESPUÉS de agrupar)', ex:'COUNT(*) > 5', run:4, c:'#ff8ea7'},
+ {k:'ORDER BY', q:'¿En qué ORDEN salen?', ex:'edad DESC', run:6, c:'#b9a9ff'},
+ {k:'LIMIT', q:'¿CUÁNTAS filas como máximo?', ex:'3', run:7, c:'#f5a65b'}
+];
+const clsColor = k => (CLS.find(x => x.k === k) || {}).c || '#fff';
+function baseMap() {
+  return `<div class="cmap">${CLS.map((c, i) => `<div class="cl" style="border-color:${c.c}"><span class="cn">${i + 1}º</span><b style="color:${c.c}">${c.k}</b><span class="cq">${c.q}<br><code>${esc(c.ex)}</code></span><span class="cr">MySQL lo ejecuta el <b>${c.run}º</b></span></div>`).join('')}</div>
+   <p class="small">Se <b>escribe</b> en este orden (de arriba abajo). Piénsalo como pedir datos en una biblioteca: <b>¿de qué estantería</b> (FROM)? → <b>¿qué libros</b> me quedo (WHERE)? → ¿los <b>agrupo</b> (GROUP BY)? → ¿qué <b>grupos</b> (HAVING)? → ¿qué <b>apunto</b> en mi hoja (SELECT)? → ¿en qué <b>orden</b> (ORDER BY)? → ¿<b>cuántos</b> (LIMIT)?</p>
+   <p class="small">Regla de oro: <b>WHERE</b> filtra <b>filas</b> (columnas normales). <b>HAVING</b> filtra <b>grupos</b> (COUNT, AVG, SUM...). Solo existen si las necesitas: <code>SELECT … FROM …</code> ya es una consulta completa.</p>`;
+}
+function colorSql(sql) {
+  const parts = clausesOf(sql.trim().replace(/;$/, '')); if (!parts.length) return `<pre class="code">${esc(sql)}</pre>`;
+  return `<pre class="code colsql">${parts.map(p => `<span style="color:${clsColor(p.k)}"><b>${p.k}</b> ${esc(p.t)}</span>`).join('\n')}</pre>`;
+}
+const BORD = [
+ {t:'SELECT + FROM + WHERE', pieces:["SELECT dni_vecino, nombre_v_vecino", "FROM Vecino", "WHERE apellido1_vecino = 'García'"]},
+ {t:'Con ORDER BY y LIMIT', pieces:["SELECT id_parcela, metros", "FROM Parcela", "WHERE metros > 25", "ORDER BY metros DESC", "LIMIT 3"]},
+ {t:'Con GROUP BY y HAVING (todas las piezas)', pieces:["SELECT orientacion, COUNT(*)", "FROM Parcela", "WHERE metros > 20", "GROUP BY orientacion", "HAVING COUNT(*) > 1", "ORDER BY COUNT(*) DESC"]}
+];
+const BQA_Q = [
+ ['Quiero que solo salgan las parcelas de más de 25 m².', 'WHERE', 'Filtras FILAS (una condición sobre una columna normal): WHERE.'],
+ ['Quiero que salgan primero las más grandes.', 'ORDER BY', 'Es el orden de salida: ORDER BY … DESC.'],
+ ['Solo quiero las 3 primeras filas.', 'LIMIT', 'Número máximo de filas: LIMIT 3 (va el último).'],
+ ['Quiero saber cuántas parcelas hay en cada orientación.', 'GROUP BY', 'Una fila por cada orientación: GROUP BY orientacion.'],
+ ['De esas orientaciones, quiero solo las que tienen más de 1 parcela.', 'HAVING', 'La condición es sobre una cuenta (COUNT) ya agrupada: HAVING.'],
+ ['Tengo que decir de qué tabla leo los datos.', 'FROM', 'La tabla va en FROM (después del SELECT).'],
+ ['Elijo las columnas dni y nombre que quiero ver.', 'SELECT', 'Qué columnas se muestran: SELECT.'],
+ ['Antes de agrupar, descarto las parcelas de menos de 20 m².', 'WHERE', 'Es un filtro de filas ANTES de agrupar: WHERE.'],
+ ['Descarto los equipos cuya edad media es menor de 30.', 'HAVING', 'La condición es sobre un agregado (AVG): HAVING.'],
+ ['El resultado debe salir por orden alfabético del nombre.', 'ORDER BY', 'ORDER BY nombre.']
+];
+const BQ_WH = [
+ ['Equipos con más de 5 ciclistas (COUNT(*) > 5).', 'HAVING', 'COUNT es un agregado → HAVING (y después de GROUP BY).'],
+ ['Ciclistas de más de 30 años (edad > 30).', 'WHERE', 'Condición sobre una columna normal → WHERE.'],
+ ['Categorías de puerto con altura media (AVG) superior a 1500.', 'HAVING', 'AVG → HAVING.'],
+ ['Puertos de categoría que empieza por E (categoria LIKE \'E%\'), antes de calcular nada.', 'WHERE', 'Filtra filas antes de agrupar → WHERE.'],
+ ['Vecinos con suma de metros (SUM) mayor que 40.', 'HAVING', 'SUM → HAVING.'],
+ ['Parcelas orientadas al Sur (orientacion = \'Sur\').', 'WHERE', 'Columna normal → WHERE.']
+];
+const BFILL = [
+ {q:'Parcelas de más de 25 m².', parts:['SELECT * ', ['FROM'], ' Parcela ', ['WHERE'], ' metros > 25;']},
+ {q:'Parcelas de más de 25 m², de mayor a menor.', parts:['SELECT * FROM Parcela WHERE metros > 25 ', ['ORDER BY'], ' metros DESC;']},
+ {q:'Las 3 parcelas más grandes.', parts:['SELECT * FROM Parcela ', ['ORDER BY'], ' metros DESC ', ['LIMIT'], ' 3;']},
+ {q:'Cuántas parcelas hay por orientación.', parts:['SELECT orientacion, COUNT(*) FROM Parcela ', ['GROUP BY'], ' orientacion;']},
+ {q:'Orientaciones con más de una parcela.', parts:['SELECT orientacion, COUNT(*) FROM Parcela GROUP BY orientacion ', ['HAVING'], ' COUNT(*) > 1;']},
+ {q:'Orientaciones con más de una parcela, mirando solo parcelas de más de 20 m².', parts:['SELECT orientacion, COUNT(*) FROM Parcela ', ['WHERE'], ' metros > 20 ', ['GROUP BY'], ' orientacion ', ['HAVING'], ' COUNT(*) > 1;']}
+];
+let bs = null;
+const KW = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'HAVING', 'ORDER BY', 'LIMIT'];
+function baseHome() {
+  const d = save.dmlBase || (save.dmlBase = {}), mk = k => d[k] ? '✔' : '▶';
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.dml()">← Taller DML</button></div><section class="hero"><h1>🧭 Paso 0: dónde y cuándo va cada cosa</h1>
+   <p>Esto es lo básico: <b>FROM, WHERE, GROUP BY, HAVING, ORDER BY y LIMIT</b>: qué hace cada uno y <b>en qué orden</b> se escribe. Si esto está claro, el resto del DML sale solo.</p>${baseMap()}</section>
+   <ol class="plan"><li class="${d.ord ? 'dn' : ''}"><button onclick="BQA.baseOrder(0)"><span>${mk('ord')}</span> 1 · Ordena las piezas <small>3 consultas</small></button></li>
+   <li class="${d.qa ? 'dn' : ''}"><button onclick="BQA.baseQuiz('qa')"><span>${mk('qa')}</span> 2 · ¿Qué cláusula uso? <small>10 preguntas</small></button></li>
+   <li class="${d.fill ? 'dn' : ''}"><button onclick="BQA.baseFill(0)"><span>${mk('fill')}</span> 3 · Rellena los huecos <small>6 consultas</small></button></li>
+   <li class="${d.wh ? 'dn' : ''}"><button onclick="BQA.baseQuiz('wh')"><span>${mk('wh')}</span> 4 · ¿WHERE o HAVING? <small>6 preguntas</small></button></li>
+   ${LAYERS.map((l, i) => `<li class="${d['c' + i] ? 'dn' : ''}"><button onclick="BQA.layerOpen(${i})"><span>${mk('c' + i)}</span> ${5 + i} · Constructor por capas: ${esc(l.t)} <small>ves el resultado en cada paso</small></button></li>`).join('')}</ol>`);
+}
+// ---- 1) ordenar piezas ----
+function baseOrder(i) {
+  const o = BORD[i]; let idx = o.pieces.map((_, k) => k); do { idx.sort(() => Math.random() - .5); } while (idx.every((v, k) => v === k));
+  bs = {kind: 'ord', i, idx}; drawOrder2();
+}
+function drawOrder2() {
+  const o = BORD[bs.i];
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.base()">✕ Salir</button><span class="small">Ordena ${bs.i + 1}/${BORD.length}</span></div><section class="qcard"><div class="qhead"><span class="tag">🧭 ORDENA LAS PIEZAS</span></div><h2>${esc(o.t)}</h2>
+   <p class="hint">Estas piezas de una consulta están desordenadas. Usa ▲ ▼ para ponerlas en el orden en que se <b>escriben</b>.</p>
+   <ol class="order">${bs.idx.map((k, p) => `<li><span class="mono">${esc(o.pieces[k])}</span><span class="ob"><button onclick="BQA.baseMv(${p},-1)" ${p === 0 ? 'disabled' : ''}>▲</button><button onclick="BQA.baseMv(${p},1)" ${p === bs.idx.length - 1 ? 'disabled' : ''}>▼</button></span></li>`).join('')}</ol>
+   <div class="row"><button class="primary" onclick="BQA.baseOrdCheck()">✓ Comprobar</button></div><div id="boFb"></div></section>`);
+}
+function baseMv(p, d) { const q = p + d; [bs.idx[p], bs.idx[q]] = [bs.idx[q], bs.idx[p]]; drawOrder2(); }
+function baseOrdCheck() {
+  const o = BORD[bs.i], ok = bs.idx.every((v, p) => v === p);
+  const why = o.pieces.map(pc => { const k = (/^(SELECT|FROM|WHERE|GROUP BY|HAVING|ORDER BY|LIMIT)/.exec(pc) || [])[1]; const c = CLS.find(x => x.k === k); return `<li><b style="color:${c.c}">${c.k}</b>: ${c.q} <code>${esc(pc)}</code></li>`; }).join('');
+  if (ok) { const d = save.dmlBase || (save.dmlBase = {}); if (bs.i + 1 >= BORD.length) d.ord = true; save.xp += 15; persist(); }
+  $('boFb').innerHTML = `<div class="feedback ${ok ? 'ok' : 'ko'}"><h3>${ok ? '✅ ¡Orden correcto!' : '✘ Todavía no'}</h3>${ok ? '' : '<p class="small">Pista: SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT.</p>'}<ol class="plist">${why}</ol>${ok ? `<div class="row">${bs.i + 1 < BORD.length ? `<button class="primary" onclick="BQA.baseOrder(${bs.i + 1})">Siguiente →</button>` : '<button class="primary" onclick="BQA.base()">Terminar</button>'}</div>` : ''}</div>`;
+}
+// ---- 2 y 4) elegir la cláusula ----
+function baseQuiz(kind) { bs = {kind, i: 0, good: 0, list: kind === 'qa' ? BQA_Q : BQ_WH}; drawQuiz(); }
+function drawQuiz() {
+  const q = bs.list[bs.i], opts = bs.kind === 'qa' ? KW : ['WHERE', 'HAVING'];
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.base()">✕ Salir</button><span class="small">${bs.i + 1}/${bs.list.length} · aciertos ${bs.good}</span></div><section class="qcard"><div class="qhead"><span class="tag">🧭 ${bs.kind === 'qa' ? '¿QUÉ CLÁUSULA USO?' : '¿WHERE O HAVING?'}</span></div><h2>${esc(q[0])}</h2>
+   <div class="opts" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">${opts.map(o => `<button class="opt" onclick="BQA.baseQuizPick('${o}')" style="border-color:${clsColor(o)}"><b>${o}</b></button>`).join('')}</div><div id="bqFb"></div></section>`);
+}
+function baseQuizPick(o) {
+  const q = bs.list[bs.i], ok = o === q[1]; if (ok) bs.good++;
+  document.querySelectorAll('.opt').forEach(b => { b.disabled = true; if (b.textContent.trim() === q[1]) b.classList.add('good'); else if (b.textContent.trim() === o) b.classList.add('bad'); });
+  const last = bs.i + 1 >= bs.list.length;
+  if (last) { const d = save.dmlBase || (save.dmlBase = {}); if (bs.good >= bs.list.length - 1) d[bs.kind] = true; save.xp += bs.good * 3; persist(); }
+  $('bqFb').innerHTML = `<div class="feedback ${ok ? 'ok' : 'ko'}"><h3>${ok ? '✅ Correcto' : '✘ Era ' + q[1]}</h3><p>${esc(q[2])}</p><div class="row"><button class="primary" onclick="${last ? 'BQA.base()' : 'BQA.baseQuizNext()'}">${last ? `Terminar (${bs.good}/${bs.list.length})` : 'Siguiente →'}</button></div></div>`;
+}
+function baseQuizNext() { bs.i++; drawQuiz(); }
+// ---- 3) huecos ----
+function baseFill(i) {
+  bs = {kind: 'fill', i}; const f = BFILL[i]; let n = 0;
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.base()">✕ Salir</button><span class="small">Huecos ${i + 1}/${BFILL.length}</span></div><section class="qcard"><div class="qhead"><span class="tag">🧭 RELLENA LOS HUECOS</span></div><h2>${esc(f.q)}</h2>
+   <p class="hint">Elige la palabra que falta en cada hueco.</p><pre class="code" style="white-space:pre-wrap">${f.parts.map(p => Array.isArray(p) ? `<select class="fillsel" data-n="${n++}"><option value="">?</option>${KW.map(k => `<option>${k}</option>`).join('')}</select>` : esc(p)).join('')}</pre>
+   <div class="row"><button class="primary" onclick="BQA.baseFillCheck()">✓ Comprobar</button></div><div id="bfFb"></div></section>`);
+}
+function baseFillCheck() {
+  const f = BFILL[bs.i], blanks = f.parts.filter(Array.isArray).map(p => p[0]), sels = [...document.querySelectorAll('.fillsel')];
+  if (sels.some(s => !s.value)) { $('bfFb').innerHTML = '<div class="feedback ko"><p>Rellena todos los huecos.</p></div>'; return; }
+  const res = sels.map((s, k) => s.value === blanks[k]); sels.forEach((s, k) => { s.classList.add(res[k] ? 'good' : 'bad'); s.disabled = true; });
+  const ok = res.every(Boolean); if (ok) { if (bs.i + 1 >= BFILL.length) (save.dmlBase || (save.dmlBase = {})).fill = true; save.xp += 10; persist(); }
+  $('bfFb').innerHTML = `<div class="feedback ${ok ? 'ok' : 'ko'}"><h3>${ok ? '✅ ¡Bien!' : '✘ Revisa los marcados'}</h3>${ok ? '' : `<p>Eran: ${blanks.map(b => '<b>' + b + '</b>').join(', ')}</p>`}<p class="small">${blanks.map(b => { const c = CLS.find(x => x.k === b); return `<b style="color:${c.c}">${b}</b>: ${c.q}`; }).join('<br>')}</p><div class="row">${bs.i + 1 < BFILL.length ? `<button class="primary" onclick="BQA.baseFill(${bs.i + 1})">Siguiente →</button>` : '<button class="primary" onclick="BQA.base()">Terminar</button>'}</div></div>`;
+}
+// ---- constructor por capas ----
+const LAYERS = [
+ {t:'FROM → WHERE → SELECT → ORDER BY → LIMIT', db:'huerto', q:'Muestra id_parcela, metros y dni_vecino de las 3 parcelas más grandes de más de 25 metros.', steps:[
+  {c:'FROM', say:'Empieza por lo más simple: <b>¿de qué tabla?</b> Escribe todas las columnas de esa tabla: <code>SELECT * FROM …</code>', ref:'SELECT * FROM Parcela', hint:'SELECT * FROM Parcela'},
+  {c:'WHERE', say:'Ahora <b>filtra las FILAS</b>: solo las de más de 25 metros. Añade <code>WHERE …</code> justo detrás del FROM. Fíjate cómo baja el nº de filas.', ref:'SELECT * FROM Parcela WHERE metros > 25', hint:'… FROM Parcela WHERE metros > 25'},
+  {c:'SELECT', say:'Ahora elige las <b>COLUMNAS</b>: cambia el <code>*</code> por <code>id_parcela, metros, dni_vecino</code>. Las filas son las mismas; cambian las columnas.', ref:'SELECT id_parcela, metros, dni_vecino FROM Parcela WHERE metros > 25', hint:'SELECT id_parcela, metros, dni_vecino FROM …'},
+  {c:'ORDER BY', say:'Ordénalas de mayor a menor metros: <code>ORDER BY metros DESC</code> va <b>al final</b>.', ref:'SELECT id_parcela, metros, dni_vecino FROM Parcela WHERE metros > 25 ORDER BY metros DESC', hint:'… ORDER BY metros DESC'},
+  {c:'LIMIT', say:'Y solo las 3 primeras: <code>LIMIT 3</code> va <b>después</b> del ORDER BY.', ref:'SELECT id_parcela, metros, dni_vecino FROM Parcela WHERE metros > 25 ORDER BY metros DESC LIMIT 3', hint:'… ORDER BY metros DESC LIMIT 3'}]},
+ {t:'GROUP BY → HAVING', db:'huerto', q:'Cuántas parcelas hay en cada orientación, mostrando solo las orientaciones con más de una parcela, de más a menos parcelas.', steps:[
+  {c:'FROM', say:'Mira la tabla: <code>SELECT * FROM Parcela</code>.', ref:'SELECT * FROM Parcela', hint:'SELECT * FROM Parcela'},
+  {c:'GROUP BY', say:'<b>Agrupa</b> por orientación y cuenta: <code>SELECT orientacion, COUNT(*) FROM Parcela GROUP BY orientacion</code>. Ahora hay <b>una fila por grupo</b>.', ref:'SELECT orientacion, COUNT(*) FROM Parcela GROUP BY orientacion', hint:'SELECT orientacion, COUNT(*) FROM Parcela GROUP BY orientacion'},
+  {c:'HAVING', say:'Ahora filtra los <b>GRUPOS</b>: solo los que tienen más de 1 parcela. Como es una condición sobre <code>COUNT(*)</code>, va en <code>HAVING</code> (después del GROUP BY).', ref:'SELECT orientacion, COUNT(*) FROM Parcela GROUP BY orientacion HAVING COUNT(*) > 1', hint:'… GROUP BY orientacion HAVING COUNT(*) > 1'},
+  {c:'ORDER BY', say:'Y ordena de más a menos parcelas: <code>ORDER BY COUNT(*) DESC</code>.', ref:'SELECT orientacion, COUNT(*) FROM Parcela GROUP BY orientacion HAVING COUNT(*) > 1 ORDER BY COUNT(*) DESC', hint:'… ORDER BY COUNT(*) DESC'}]},
+ {t:'WHERE antes de agrupar + HAVING después', db:'ciclismo', q:'Altura media y categoría de los puertos de categoría E, solo si la media supera 1500 m.', steps:[
+  {c:'FROM', say:'Mira la tabla: <code>SELECT * FROM puerto</code> (14 puertos).', ref:'SELECT * FROM puerto', hint:'SELECT * FROM puerto'},
+  {c:'WHERE', say:'<b>Primero filtra las filas</b> de categoría E (antes de calcular nada): <code>WHERE categoria = \'E\'</code> (o <code>LIKE \'E%\'</code>).', ref:["SELECT * FROM puerto WHERE categoria = 'E'","SELECT * FROM puerto WHERE categoria LIKE 'E%'"], hint:"… WHERE categoria = 'E'"},
+  {c:'GROUP BY', say:'Ahora calcula la media por categoría: <code>SELECT AVG(altura), categoria … GROUP BY categoria</code>. Observa: el WHERE va <b>antes</b> del GROUP BY.', ref:["SELECT AVG(altura), categoria FROM puerto WHERE categoria = 'E' GROUP BY categoria","SELECT AVG(altura), categoria FROM puerto WHERE categoria LIKE 'E%' GROUP BY categoria"], hint:"SELECT AVG(altura), categoria FROM puerto WHERE … GROUP BY categoria"},
+  {c:'HAVING', say:'Y por último, filtra el <b>grupo</b>: <code>HAVING AVG(altura) &gt; 1500</code>.', ref:["SELECT AVG(altura), categoria FROM puerto WHERE categoria = 'E' GROUP BY categoria HAVING AVG(altura) > 1500","SELECT AVG(altura), categoria FROM puerto WHERE categoria LIKE 'E%' GROUP BY categoria HAVING AVG(altura) > 1500"], hint:'… GROUP BY categoria HAVING AVG(altura) > 1500'}]},
+ {t:'Subconsulta paso a paso', db:'ciclismo', q:'Dorsal, nombre y edad del ciclista más joven.', steps:[
+  {c:'SELECT', say:'Primero: <b>¿cuál es la edad mínima?</b> <code>SELECT MIN(edad) FROM ciclista</code> (da un número).', ref:'SELECT MIN(edad) FROM ciclista', hint:'SELECT MIN(edad) FROM ciclista'},
+  {c:'WHERE', say:'Con ese número (23) busca a quién lo tiene: <code>SELECT dorsal, nombre, edad FROM ciclista WHERE edad = 23</code>. (No se puede escribir <code>SELECT dorsal, MIN(edad)</code>: el MIN es una fila resumen.)', ref:'SELECT dorsal, nombre, edad FROM ciclista WHERE edad = 23', hint:'… FROM ciclista WHERE edad = 23'},
+  {c:'WHERE', say:'Ahora <b>sustituye el 23</b> por la subconsulta que lo calcula: <code>WHERE edad = (SELECT MIN(edad) FROM ciclista)</code>. Así vale aunque cambien los datos.', ref:'SELECT dorsal, nombre, edad FROM ciclista WHERE edad = (SELECT MIN(edad) FROM ciclista)', hint:'… WHERE edad = (SELECT MIN(edad) FROM ciclista)'}]}
+];
+let ly = null;
+function layerOpen(i) { ly = {i, s: 0, text: ''}; layerDraw(); }
+function layerDraw() {
+  const L = LAYERS[ly.i], st = L.steps[ly.s];
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.base()">✕ Salir</button><span class="small">Capa ${ly.i + 1}/${LAYERS.length} · paso ${ly.s + 1}/${L.steps.length}</span></div><section class="qcard"><div class="qhead"><span class="tag" style="border-color:${clsColor(st.c)}">🧭 AÑADE: ${st.c}</span></div><h2>${esc(L.t)}</h2>
+   <div class="statement"><p><b>Objetivo final:</b> ${esc(L.q)}</p><div class="bar" style="width:100%"><i style="width:${Math.round(ly.s / L.steps.length * 100)}%"></i></div></div>
+   <div class="statement"><p>${st.say}</p>${dataViewer(L.db)}<textarea id="lyIn" class="editor" rows="5" spellcheck="false" placeholder="Escribe o amplía tu consulta…">${esc(ly.text)}</textarea>
+   <div class="row"><button class="primary" onclick="BQA.layerCheck()">✓ Comprobar este paso</button><button class="ghost" onclick="BQA.layerHint()">💡 Pista</button><button class="ghost" onclick="BQA.layerSol()">👁 Ver este paso</button></div><div id="lyFb"></div></div></section>`);
+}
+function layerHint() { const st = LAYERS[ly.i].steps[ly.s]; $('lyFb').innerHTML = `<div class="hint">💡 ${esc(st.hint)}</div>`; }
+function layerSol() { const st = LAYERS[ly.i].steps[ly.s]; const r = [].concat(st.ref)[0]; $('lyIn').value = r; ly.text = r; $('lyFb').innerHTML = `<div class="feedback ko"><h3>👁 Este paso</h3>${colorSql(r)}<p class="small">Cada color es una cláusula. Pulsa «Comprobar» para ver su resultado.</p></div>`; }
+function layerCheck() {
+  const L = LAYERS[ly.i], st = L.steps[ly.s], txt = $('lyIn').value; ly.text = txt; if (!txt.trim()) { $('lyFb').innerHTML = '<div class="feedback ko"><p>Escribe tu consulta.</p></div>'; return; }
+  const ordered = /ORDER BY/i.test([].concat(st.ref)[0]), g = SQLX.gradeDml({db: L.db, kind: 'select', ref: st.ref, ordered}, txt, T2.mkEngine.bind(null));
+  let body = g.error ? `<div class="dres bad"><b>MySQL dice:</b><br>❌ ${esc(g.error)}</div>` : `${g.msgs.length ? `<ul class="errs">${g.msgs.map(m => `<li class="bad">${esc(m)}</li>`).join('')}</ul>` : ''}${g.user && g.user.kind === 'select' ? `<div class="dres"><b>Tu resultado: ${g.user.rows.length} fila(s) × ${g.user.cols.length} columna(s)</b>${resultTable(g.user, 6)}</div>` : ''}`;
+  if (g.ok) { const last = ly.s + 1 >= L.steps.length; if (last) { (save.dmlBase || (save.dmlBase = {}))['c' + ly.i] = true; save.xp += 30; persist(); }
+    body = `<div class="feedback ok"><h3>${last ? '✅ ¡Consulta completa!' : '✅ ¡Paso correcto!'}</h3>${colorSql(txt)}${body}<div class="row">${last ? '<button class="primary" onclick="BQA.base()">Terminar</button>' : '<button class="primary" onclick="BQA.layerNext()">Siguiente capa →</button>'}</div></div>`; }
+  else body = `<div class="feedback ko"><h3>Casi: compara con lo que se pide</h3>${body}</div>`;
+  $('lyFb').innerHTML = body;
+}
+function layerNext() { ly.s++; layerDraw(); }
+
+// =====================================================================================
+// VERSIÓN SOLO DML (BDA-DML.html): una sola pantalla, 6 pasos
+// =====================================================================================
+function dmlOnlyHome() {
+  const bs0 = save.dmlBase || {}, d = save.dml || {}, pc = save.paper || {}, weak = save.dmlWeak || [];
+  const lows = (k, arr) => arr.filter(t => dmlLevel(t) <= 2).map(t => k + ':' + t.id);
+  const r12 = lows('dmlr', D.DMLR), w12 = lows('dmlw', D.DMLW);
+  const L = [
+    {g: '🧭 Paso 0 · Dónde y cuándo va cada cosa'},
+    {t: 'Ordena las piezas de una consulta', tag: 'orden', done: bs0.ord, go: 'BQA.baseOrder(0)'},
+    {t: '¿Qué cláusula uso?', tag: 'FROM/WHERE/…', done: bs0.qa, go: "BQA.baseQuiz('qa')"},
+    {t: 'Rellena los huecos', tag: 'huecos', done: bs0.fill, go: 'BQA.baseFill(0)'},
+    {t: '¿WHERE o HAVING?', tag: 'filtro', done: bs0.wh, go: "BQA.baseQuiz('wh')"},
+    ...LAYERS.map((l, i) => ({t: 'Constructor por capas: ' + l.t, tag: 'ves el resultado', done: bs0['c' + i], go: `BQA.layerOpen(${i})`})),
+    {g: '⚡ Repaso express (aprendes 20 s y lo escribes)'},
+    ...DL.map((l, i) => ({t: l.t, tag: weak.includes(l.tag) ? 'te cuesta' : l.tag, done: d[l.id], weak: weak.includes(l.tag), go: `BQA.dmlOpen(${i})`})),
+    {g: '✏️ En papel (como el examen)'},
+    {t: 'Revisar sentencias con error · fáciles', tag: '5 en el examen', done: r12.every(i => pc[i] !== undefined), go: "BQA.paperList('dmlr',1)"},
+    {t: 'Escribir una consulta desde cero · fáciles', tag: '1 en el examen', done: w12.every(i => pc[i] !== undefined), go: "BQA.paperList('dmlw',1)"},
+    {t: 'Revisar errores · todos los niveles', tag: '🟡🔴', done: false, go: "BQA.paperList('dmlr',0)"},
+    {t: 'Desde cero · todos los niveles', tag: '🟡🔴', done: false, go: "BQA.paperList('dmlw',0)"},
+    {t: '🎯 Simulacro: 5 con error + 1 desde cero (papel)', tag: 'examen', done: false, go: 'BQA.dmlPaperExam()'}
+  ];
+  const items = L.filter(x => !x.g), n = items.filter(x => x.done).length, nxt = items.find(x => !x.done);
+  let k = 0;
+  view(`<section class="hero"><h1>🧪 Taller: DML desde cero</h1>
+   <p>Una idea cada vez: leo 20 segundos, escribo mi consulta y el verificador me dice <b>qué falla y por qué</b>. Solo lo que entra: <b>una tabla</b> · <b>5 sentencias con error</b> para revisar + <b>1 desde cero</b> · alias opcional.</p>
+   <div class="bar" style="width:100%;margin:6px 0"><i style="width:${Math.round(n / items.length * 100)}%"></i></div><p class="small">${n} de ${items.length} pasos superados</p>
+   <details class="rules"><summary>📋 Todo en 1 minuto (resumen exprés)</summary>${CHULETA.dml}</details>
+   <div class="row big"><button class="primary" onclick="BQA.dmlDiag()">🩺 ¿Qué parte me falla? (diagnóstico, 5 min)</button>${nxt ? `<button onclick="${nxt.go}">▶ ${n ? 'Seguir' : 'Empezar'}: ${esc(nxt.t)}</button>` : ''}</div>
+   <div class="row"><button class="ghost" id="tmBtn" onclick="BQA.pomo()">⏱ 25</button><span class="small">25 min de estudio, 5 de descanso.</span></div></section>
+   ${L.map(x => x.g ? `</ol><h2 class="sec">${x.g}</h2><ol class="plan">` : `<li class="${x.done ? 'dn' : ''}"><button onclick="${x.go}"><span>${x.done ? '✔' : (x.weak ? '🔥' : ++k)}</span> ${esc(x.t)} <small>${esc(x.tag)}</small></button></li>`).join('').replace(/^<\/ol>/, '')}</ol>`);
+  pomoTick(); hud();
+}
+function dmlPaperExam() {
+  const rev = shuffle(D.DMLR.filter(t => !t.noExam && dmlLevel(t) <= 3)).slice(0, 5).map(t => 'dmlr:' + t.id), one = 'dmlw:' + pick(D.DMLW.filter(t => dmlLevel(t) <= 3)).id;
+  paperOpen(null, 0, [...rev, one], 'Simulacro DML (papel)');
 }

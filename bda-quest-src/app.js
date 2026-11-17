@@ -9,7 +9,7 @@ const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floo
 const pick = a => a[Math.floor(Math.random()*a.length)];
 const UNITS = D.UNITS, unitById = id => UNITS.find(u => u.id === id);
 const caseById = id => D.CASES.find(c => c.id === id);
-const KEY = 'bdaquest_v1';
+const KEY = window.DML_ONLY ? 'bdadml_v1' : 'bdaquest_v1';
 const fresh = () => ({paper:{}, plan:{}, xp:0, streak:0, best:0, done:0, right:0, fails:{}, recent:[], unit:{}, exams:[]});
 let save;
 try { save = {...fresh(), ...JSON.parse(localStorage.getItem(KEY) || '{}')}; } catch { save = fresh(); }
@@ -60,6 +60,7 @@ function pomoToggle(){ if(pomo.end){ clearInterval(pomo.t); pomo.end=0; pomoTick
 function planNext(){ const i = PLAN.findIndex((p,k) => !save.plan[k]); return i<0 ? -1 : i; }
 function planGo(i){ pendingPlan = i; PLAN[i].go(); if(PLAN[i].cheat){ save.plan[i]=true; persist(); pendingPlan=null; } }
 function home(){
+  if(window.DML_ONLY) return dmlOnlyHome();
   const n = planNext(), done = Object.keys(save.plan).length, pct = Math.round(done/PLAN.length*100);
   const cur = n<0 ? null : PLAN[n];
   view(`<section class="hero"><h1>Plan para el examen</h1>
@@ -356,8 +357,8 @@ function reset(){ if(confirm('¿Borrar todo el progreso y los fallos guardados?'
 
 // ---------- API para los botones ----------
 window.BQA = {
-  dml:dmlTallerHome, dmlOpen, dmlHint2, dmlSol, dmlCheck, dmlDiag, dmlDiagCheck, dmlExam, taller:tallerHome, tallerOpen, tallerHint, tallerSol, tallerCheck, tallerDiag, tallerDiagCheck, paper:paperHome, paperRoute, paperRouteGo, paperList, paperOpen, paperHint, paperCorrect, paperTick, paperAll, paperNext, paperExam, paperPrint,
-  home, planGo, pomo:pomoToggle, planSkip(i){ save.plan[i]=true; persist(); home(); }, unit:unitView, campaign, review, exam, casePart, cheats, progress, reset, check, selfOk,
+  base:baseHome, baseOrder, baseMv, baseOrdCheck, baseQuiz, baseQuizPick, baseQuizNext, baseFill, baseFillCheck, layerOpen, layerHint, layerSol, layerCheck, layerNext, dml:dmlTallerHome, dmlOpen, dmlHint2, dmlSol, dmlCheck, dmlDiag, dmlDiagCheck, dmlExam, taller:tallerHome, tallerOpen, tallerHint, tallerSol, tallerCheck, tallerDiag, tallerDiagCheck, paper:paperHome, paperRoute, paperRouteGo, paperList, paperOpen, paperHint, paperCorrect, paperTick, paperAll, paperNext, paperExam, paperPrint,
+  dmlPaperExam, home, planGo, pomo:pomoToggle, planSkip(i){ save.plan[i]=true; persist(); home(); }, unit:unitView, campaign, review, exam, casePart, cheats, progress, reset, check, selfOk,
   quit(){ if(!run || confirm('¿Salir? Lo contestado ya cuenta para el progreso.')) home(); },
   opt(i){ if(st.answered) return; if(st.q.type==='multi'){ st.sel.has(i)?st.sel.delete(i):st.sel.add(i); } else { st.sel = new Set([i]); }
     document.querySelectorAll('.opt').forEach(b=>b.classList.toggle('on', st.sel.has(+b.dataset.i))); if(st.q.type==='choice') check(); },
@@ -373,6 +374,7 @@ window.BQA = {
     else { st.marked.add(i); box.classList.add('on'); box.querySelector('.why').classList.remove('hidden'); box.querySelector('textarea').focus(); }
     $('markCount').textContent = `Líneas marcadas: ${st.marked.size} de ${Object.keys(st.q.cs.errors).length}`; }
 };
+if(window.DML_ONLY){ BQA.paper = home; }
 document.addEventListener('keydown', e => { if(e.key==='Enter' && (e.ctrlKey || e.metaKey) && st.q){ e.preventDefault(); check(); } });
 home();
 })();

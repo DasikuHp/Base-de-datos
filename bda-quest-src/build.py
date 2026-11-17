@@ -24,8 +24,12 @@ DATA_FILES = ('units.js', 'units2.js', 'cases.js', 'cases2.js', 'bank.js', 'bank
 data = '\n'.join((SRC / f).read_text(encoding='utf-8') for f in DATA_FILES)
 data = inline_images(data)
 app = (SRC / 'app.js').read_text(encoding='utf-8').replace('/*TASKS2*/', (SRC / 'tasks2.js').read_text(encoding='utf-8')).replace('/*PAPER*/', (SRC / 'paper.js').read_text(encoding='utf-8')).replace('/*TALLER*/', (SRC / 'taller.js').read_text(encoding='utf-8'))
-html = (SRC / 'template.html').read_text(encoding='utf-8')
-html = html.replace('/*DATA*/', data.replace('</script', '<\\/script')).replace('/*APP*/', app.replace('</script', '<\\/script'))
-out = ROOT / 'BDA-QUEST.html'
-out.write_text(html, encoding='utf-8')
-print(f'{out.name}: {out.stat().st_size/1024:.0f} KB')
+tpl = (SRC / 'template.html').read_text(encoding='utf-8')
+def make(name, title, brand, failstyle, pre):
+    html = tpl.replace('/*TITLE*/', title).replace('/*BRAND*/', brand).replace('/*FAILSTYLE*/', failstyle)
+    html = html.replace('/*DATA*/', pre + data.replace('</script', '<\\/script')).replace('/*APP*/', app.replace('</script', '<\\/script'))
+    out = ROOT / name
+    out.write_text(html, encoding='utf-8')
+    print(f'{out.name}: {out.stat().st_size/1024:.0f} KB')
+make('BDA-QUEST.html', 'BDA-QUEST · Bases de Datos', 'BDA-QUEST', '', '')
+make('BDA-DML.html', 'DML · examen BBDD', 'DML', 'display:none', 'window.DML_ONLY=true;\n')
