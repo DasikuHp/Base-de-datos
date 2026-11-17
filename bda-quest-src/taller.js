@@ -1,0 +1,155 @@
+// BDA-QUEST · TALLER DE CREATE TABLE desde cero. Se inserta dentro de app.js (marcador TALLER).
+// Micro-lecciones: una idea cada vez → escribes tu código → el verificador te dice qué falta.
+// Más un diagnóstico que dice qué parte te falla y a qué lección ir.
+const TL = [
+ {id:'l1', t:'La estructura de un CREATE TABLE', tag:'estructura',
+  learn:`<p>Una tabla se crea así:</p><pre class="code">CREATE TABLE alumno (\n  id      INT,\n  nombre  VARCHAR(50)\n);</pre><ul class="plist"><li>Nombre de la tabla en <b>singular</b> (alumno, no alumnos).</li><li>Entre paréntesis, cada columna: <b>nombre + tipo</b>.</li><li><b>Coma</b> entre columnas (la última NO lleva coma).</li><li>Se cierra con <code>);</code></li></ul>`,
+  task:'Crea la tabla <code>libro</code> con las columnas: <code>isbn</code> (texto de hasta 13), <code>titulo</code> (texto de hasta 100) y <code>anio</code> (número entero).',
+  spec:[{name:'LIBRO', cols:[['isbn',''],['titulo',''],['anio','']]}], types:[['LIBRO','isbn','str'],['LIBRO','titulo','str'],['LIBRO','anio','int']],
+  hints:['CREATE TABLE libro ( ... );','Texto → VARCHAR(n). Número entero → INT.','No pongas coma después de la última columna.'],
+  sol:'CREATE TABLE libro (\n  isbn    VARCHAR(13),\n  titulo  VARCHAR(100),\n  anio    INT\n);'},
+ {id:'l2', t:'Los tipos de datos', tag:'tipos',
+  learn:`<p>Cada columna lleva un tipo:</p><table class="rt"><thead><tr><th>Tipo</th><th>Para qué</th><th>Ejemplo</th></tr></thead><tbody><tr><td>INT</td><td>números enteros</td><td>stock INT</td></tr><tr><td>VARCHAR(n)</td><td>texto de hasta n</td><td>nombre VARCHAR(80)</td></tr><tr><td>CHAR(n)</td><td>texto de longitud fija</td><td>dni CHAR(9)</td></tr><tr><td>DATE</td><td>fecha</td><td>fecha_alta DATE</td></tr><tr><td>DECIMAL(8,2)</td><td>dinero / decimales</td><td>precio DECIMAL(8,2)</td></tr></tbody></table>`,
+  task:'Crea <code>producto</code>: <code>codigo</code> (texto de 10), <code>nombre</code> (texto de 80), <code>precio</code> (decimal 8,2), <code>fecha_alta</code> (fecha) y <code>stock</code> (entero).',
+  spec:[{name:'PRODUCTO', cols:[['codigo',''],['nombre',''],['precio',''],['fecha_alta',''],['stock','']]}], types:[['PRODUCTO','codigo','str'],['PRODUCTO','nombre','str'],['PRODUCTO','precio','dec'],['PRODUCTO','fecha_alta','date'],['PRODUCTO','stock','int']],
+  hints:['Dinero → DECIMAL(8,2). Fecha → DATE.'], sol:'CREATE TABLE producto (\n  codigo      VARCHAR(10),\n  nombre      VARCHAR(80),\n  precio      DECIMAL(8,2),\n  fecha_alta  DATE,\n  stock       INT\n);'},
+ {id:'l3', t:'Clave primaria (PRIMARY KEY)', tag:'clave primaria',
+  learn:`<p>La <b>clave primaria</b> identifica cada fila: no se repite y no puede ser nula. Si el enunciado da un identificador (DNI, ISBN, matrícula...), <b>ese</b> es la clave.</p><pre class="code">CREATE TABLE cliente (\n  dni     CHAR(9) PRIMARY KEY,\n  nombre  VARCHAR(80)\n);</pre>`,
+  task:'Crea <code>cliente</code>: <code>dni</code> (texto de 9, es la clave primaria), <code>nombre</code> (80) y <code>email</code> (120).',
+  spec:[{name:'CLIENTE', cols:[['dni','P'],['nombre',''],['email','']]}], types:[['CLIENTE','dni','str']],
+  hints:['Detrás del tipo de dni: PRIMARY KEY.'], sol:'CREATE TABLE cliente (\n  dni     CHAR(9) PRIMARY KEY,\n  nombre  VARCHAR(80),\n  email   VARCHAR(120)\n);'},
+ {id:'l4', t:'Número automático (AUTO_INCREMENT)', tag:'clave primaria',
+  learn:`<p>Si el identificador es un número interno que se genera solo:</p><pre class="code">id_pedido  INT AUTO_INCREMENT PRIMARY KEY</pre><p class="small">Solo se usa si el enunciado da un número interno o no hay ningún identificador natural.</p>`,
+  task:'Crea <code>pedido</code>: <code>id_pedido</code> (entero, automático, clave primaria) y <code>fecha</code> (fecha).',
+  spec:[{name:'PEDIDO', cols:[['id_pedido','P'],['fecha','']]}], types:[['PEDIDO','fecha','date']], extra:db => { const c = colOf(db, 'PEDIDO', 'id_pedido'); return [{ok: !!(c && c.auto), label:'id_pedido es AUTO_INCREMENT', hint:'Añade AUTO_INCREMENT: id_pedido INT AUTO_INCREMENT PRIMARY KEY.'}]; },
+  hints:['INT AUTO_INCREMENT PRIMARY KEY, todo en la misma columna.'], sol:'CREATE TABLE pedido (\n  id_pedido  INT AUTO_INCREMENT PRIMARY KEY,\n  fecha      DATE\n);'},
+ {id:'l5', t:'Obligatorio (NOT NULL) y opcional', tag:'obligatorios',
+  learn:`<p><b>Obligatorio</b> = <code>NOT NULL</code> (siempre tiene valor). <b>Opcional</b> = sin NOT NULL (puede quedar vacío).</p><pre class="code">nombre    VARCHAR(80) NOT NULL,\ntelefono  VARCHAR(15)</pre><p class="small">El enunciado dice «puede no tener» → opcional. Lo que no dice nada, es obligatorio.</p>`,
+  task:'Crea <code>socio</code>: <code>dni</code> (texto de 9, clave primaria), <code>nombre</code> (80, obligatorio), <code>telefono</code> (15, <b>opcional</b>) y <code>email</code> (120, obligatorio).',
+  spec:[{name:'SOCIO', cols:[['dni','P'],['nombre','V'],['telefono','o'],['email','V']]}], types:[],
+  hints:['NOT NULL va después del tipo. El teléfono NO lleva NOT NULL.'], sol:'CREATE TABLE socio (\n  dni       CHAR(9) PRIMARY KEY,\n  nombre    VARCHAR(80) NOT NULL,\n  telefono  VARCHAR(15),\n  email     VARCHAR(120) NOT NULL\n);'},
+ {id:'l6', t:'Que no se repita (UNIQUE)', tag:'unique',
+  learn:`<p><code>UNIQUE</code> impide repetir el valor (clave alternativa). Si además es obligatorio: <code>NOT NULL UNIQUE</code>.</p><pre class="code">email  VARCHAR(120) NOT NULL UNIQUE</pre>`,
+  task:'Crea <code>usuario</code>: <code>id</code> (entero automático, clave primaria), <code>email</code> (120, obligatorio y <b>no puede repetirse</b>), <code>nombre</code> (80, obligatorio) y <code>apodo</code> (30, opcional).',
+  spec:[{name:'USUARIO', cols:[['id','P'],['email','AV'],['nombre','V'],['apodo','o']]}], types:[],
+  hints:['email: NOT NULL UNIQUE.'], sol:'CREATE TABLE usuario (\n  id      INT AUTO_INCREMENT PRIMARY KEY,\n  email   VARCHAR(120) NOT NULL UNIQUE,\n  nombre  VARCHAR(80) NOT NULL,\n  apodo   VARCHAR(30)\n);'},
+ {id:'l7', t:'Clave primaria de dos columnas', tag:'clave primaria',
+  learn:`<p>Cuando la clave son <b>dos columnas</b> se escribe <b>una sola vez</b> al final:</p><pre class="code">CREATE TABLE nota (\n  dni_alumno      CHAR(9),\n  cod_asignatura  VARCHAR(10),\n  nota            DECIMAL(4,2) NOT NULL,\n  PRIMARY KEY (dni_alumno, cod_asignatura)\n);</pre><p class="small">Error típico: poner PRIMARY KEY en cada columna (da «Multiple primary key»).</p>`,
+  task:'Crea <code>nota</code>: <code>dni_alumno</code> (9), <code>cod_asignatura</code> (10) y <code>nota</code> (decimal 4,2, obligatoria). La clave primaria es la pareja (dni_alumno, cod_asignatura).',
+  spec:[{name:'NOTA', cols:[['dni_alumno','P'],['cod_asignatura','P'],['nota','V']]}], types:[['NOTA','nota','dec']],
+  hints:['Al final: PRIMARY KEY (dni_alumno, cod_asignatura) — una sola línea.'], sol:'CREATE TABLE nota (\n  dni_alumno      CHAR(9),\n  cod_asignatura  VARCHAR(10),\n  nota            DECIMAL(4,2) NOT NULL,\n  PRIMARY KEY (dni_alumno, cod_asignatura)\n);'},
+ {id:'l8', t:'Clave ajena (FOREIGN KEY): 1:N', tag:'clave ajena',
+  learn:`<p>Una <b>clave ajena</b> apunta a la clave primaria de otra tabla. Reglas:</p><ol class="plist"><li>La tabla a la que apuntas se crea <b>antes</b>.</li><li>La FK va en la tabla del lado <b>N</b> (el pedido apunta al cliente).</li><li>Mismo tipo que la clave a la que apunta.</li></ol><pre class="code">CREATE TABLE pedido (\n  num_pedido   INT AUTO_INCREMENT PRIMARY KEY,\n  fecha        DATE,\n  dni_cliente  CHAR(9),\n  FOREIGN KEY (dni_cliente) REFERENCES cliente(dni)\n);</pre>`,
+  task:'Crea <code>cliente</code> (<code>dni</code> de 9, clave; <code>nombre</code> de 80) y <code>pedido</code> (<code>num_pedido</code> entero automático, clave; <code>fecha</code>; <code>dni_cliente</code> que apunta al cliente). Un cliente tiene varios pedidos.',
+  spec:[{name:'CLIENTE', cols:[['dni','P'],['nombre','']]},{name:'PEDIDO', cols:[['num_pedido','P'],['fecha',''],['dni_cliente','','CLIENTE']]}], types:[],
+  hints:['Primero cliente, después pedido.','FOREIGN KEY (dni_cliente) REFERENCES cliente(dni) — con el mismo tipo CHAR(9).'], sol:'CREATE TABLE cliente (\n  dni     CHAR(9) PRIMARY KEY,\n  nombre  VARCHAR(80)\n);\n\nCREATE TABLE pedido (\n  num_pedido   INT AUTO_INCREMENT PRIMARY KEY,\n  fecha        DATE,\n  dni_cliente  CHAR(9),\n  FOREIGN KEY (dni_cliente) REFERENCES cliente(dni)\n);'},
+ {id:'l9', t:'¿La clave ajena es obligatoria? (existencia)', tag:'obligatorios',
+  learn:`<p>«Todo empleado pertenece a un departamento» → la FK es <b>obligatoria</b> → <code>NOT NULL</code>.<br>«Un empleado <i>puede</i> no tener jefe» → la FK es <b>opcional</b> → sin NOT NULL.</p><p class="small">Es la restricción de existencia: <b>mínimo 1 → NOT NULL</b>, <b>mínimo 0 → admite NULL</b>.</p>`,
+  task:'Crea <code>departamento</code> (<code>codigo</code> entero automático, clave; <code>nombre</code> 60 obligatorio) y <code>empleado</code> (<code>dni</code> de 9, clave; <code>nombre</code> 80 obligatorio; <code>codigo_depto</code>: <b>todo empleado pertenece a un departamento</b>).',
+  spec:[{name:'DEPARTAMENTO', cols:[['codigo','P'],['nombre','V']]},{name:'EMPLEADO', cols:[['dni','P'],['nombre','V'],['codigo_depto','V','DEPARTAMENTO']]}], types:[],
+  hints:['codigo_depto debe llevar NOT NULL además de la FOREIGN KEY.'], sol:'CREATE TABLE departamento (\n  codigo  INT AUTO_INCREMENT PRIMARY KEY,\n  nombre  VARCHAR(60) NOT NULL\n);\n\nCREATE TABLE empleado (\n  dni           CHAR(9) PRIMARY KEY,\n  nombre        VARCHAR(80) NOT NULL,\n  codigo_depto  INT NOT NULL,\n  FOREIGN KEY (codigo_depto) REFERENCES departamento(codigo)\n);'},
+ {id:'l10', t:'Relación N:M → tabla intermedia', tag:'clave ajena',
+  learn:`<p>Un alumno hace varios cursos y un curso tiene varios alumnos (N:M) → una <b>tabla intermedia</b> con:</p><ul class="plist"><li>las <b>dos claves ajenas</b>,</li><li>la clave primaria <b>compuesta</b> por las dos,</li><li>los atributos de la relación (fecha, nota...).</li></ul><pre class="code">CREATE TABLE matricula (\n  dni_alumno     CHAR(9),\n  codigo_curso   INT,\n  fecha          DATE NOT NULL,\n  PRIMARY KEY (dni_alumno, codigo_curso),\n  FOREIGN KEY (dni_alumno) REFERENCES alumno(dni),\n  FOREIGN KEY (codigo_curso) REFERENCES curso(codigo)\n);</pre>`,
+  task:'Crea <code>alumno</code> (<code>dni</code> 9, clave; <code>nombre</code> 80), <code>curso</code> (<code>codigo</code> entero, clave; <code>nombre</code> 60) y <code>matricula</code> (entre alumno y curso, con <code>fecha</code> obligatoria).',
+  spec:[{name:'ALUMNO', cols:[['dni','P'],['nombre','']]},{name:'CURSO', cols:[['codigo','P'],['nombre','']]},{name:'MATRICULA', cols:[['dni_alumno','P','ALUMNO'],['codigo_curso','P','CURSO'],['fecha','V']]}], types:[],
+  hints:['La clave primaria de matricula: PRIMARY KEY (dni_alumno, codigo_curso).','Dos FOREIGN KEY, una por tabla.'], sol:'CREATE TABLE alumno (\n  dni     CHAR(9) PRIMARY KEY,\n  nombre  VARCHAR(80)\n);\n\nCREATE TABLE curso (\n  codigo  INT PRIMARY KEY,\n  nombre  VARCHAR(60)\n);\n\nCREATE TABLE matricula (\n  dni_alumno    CHAR(9),\n  codigo_curso  INT,\n  fecha         DATE NOT NULL,\n  PRIMARY KEY (dni_alumno, codigo_curso),\n  FOREIGN KEY (dni_alumno) REFERENCES alumno(dni),\n  FOREIGN KEY (codigo_curso) REFERENCES curso(codigo)\n);'},
+ {id:'l11', t:'Reflexiva: una tabla que apunta a sí misma', tag:'clave ajena',
+  learn:`<p>Un empleado puede tener un <b>jefe</b> que es otro empleado → una FK de la tabla <b>a ella misma</b>. Si el director no tiene jefe, la FK <b>admite NULL</b>.</p><pre class="code">dni_jefe  CHAR(9),\nFOREIGN KEY (dni_jefe) REFERENCES empleado(dni)</pre>`,
+  task:'Crea <code>empleado</code>: <code>dni</code> (9, clave), <code>nombre</code> (80, obligatorio) y <code>dni_jefe</code> (su jefe, que es otro empleado; el director general no tiene jefe).',
+  spec:[{name:'EMPLEADO', cols:[['dni','P'],['nombre','V'],['dni_jefe','o','EMPLEADO']]}], types:[],
+  hints:['La FK apunta a la propia tabla: REFERENCES empleado(dni). Sin NOT NULL.'], sol:'CREATE TABLE empleado (\n  dni       CHAR(9) PRIMARY KEY,\n  nombre    VARCHAR(80) NOT NULL,\n  dni_jefe  CHAR(9),\n  FOREIGN KEY (dni_jefe) REFERENCES empleado(dni)\n);'},
+ {id:'l12', t:'Ternaria: tres claves ajenas', tag:'clave ajena',
+  learn:`<p>Una relación entre <b>tres</b> entidades → tabla con las <b>tres FKs</b> y clave primaria de <b>las tres</b> columnas.</p><pre class="code">PRIMARY KEY (proveedor_id, producto_id, almacen_id)</pre>`,
+  task:'Crea <code>proveedor</code>, <code>producto</code> y <code>almacen</code> (cada una con <code>id</code> entero como clave primaria) y <code>suministro</code>: un proveedor suministra un producto a un almacén con un <code>precio</code> obligatorio (decimal 8,2).',
+  spec:[{name:'PROVEEDOR', cols:[['id','P']]},{name:'PRODUCTO', cols:[['id','P']]},{name:'ALMACEN', cols:[['id','P']]},{name:'SUMINISTRO', cols:[['proveedor_id','P','PROVEEDOR'],['producto_id','P','PRODUCTO'],['almacen_id','P','ALMACEN'],['precio','V']]}], types:[],
+  hints:['Tres FOREIGN KEY y PRIMARY KEY (proveedor_id, producto_id, almacen_id).'], sol:'CREATE TABLE proveedor (id INT PRIMARY KEY);\nCREATE TABLE producto  (id INT PRIMARY KEY);\nCREATE TABLE almacen   (id INT PRIMARY KEY);\n\nCREATE TABLE suministro (\n  proveedor_id  INT,\n  producto_id   INT,\n  almacen_id    INT,\n  precio        DECIMAL(8,2) NOT NULL,\n  PRIMARY KEY (proveedor_id, producto_id, almacen_id),\n  FOREIGN KEY (proveedor_id) REFERENCES proveedor(id),\n  FOREIGN KEY (producto_id)  REFERENCES producto(id),\n  FOREIGN KEY (almacen_id)   REFERENCES almacen(id)\n);'},
+ {id:'l13', t:'Orden de creación y nombres en singular', tag:'orden y nombres',
+  learn:`<p>Dos trampas del examen:</p><ol class="plist"><li><b>Orden</b>: crea primero la tabla a la que apuntan las demás (cliente antes que pedido).</li><li><b>Singular</b>: el enunciado dice «clientes» y «pedidos», pero las tablas se llaman <code>cliente</code> y <code>pedido</code>.</li></ol>`,
+  task:'Una tienda guarda <b>clientes</b> y <b>pedidos</b>. Cliente: dni (9, clave) y nombre (80, obligatorio). Pedido: número (entero automático, clave), fecha (obligatoria) y el cliente que lo hace (<b>obligatorio</b>). Escribe el DDL.',
+  spec:[{name:'CLIENTE', cols:[['dni','P'],['nombre','V']]},{name:'PEDIDO', cols:[['numero','P'],['fecha','V'],['dni_cliente','V','CLIENTE']]}], types:[], loose:{PEDIDO:{numero:['num_pedido','id_pedido','id','numero','num']}},
+  hints:['Tablas: cliente y pedido (singular), cliente primero.','La FK dni_cliente es obligatoria: NOT NULL.'], sol:'CREATE TABLE cliente (\n  dni     CHAR(9) PRIMARY KEY,\n  nombre  VARCHAR(80) NOT NULL\n);\n\nCREATE TABLE pedido (\n  numero       INT AUTO_INCREMENT PRIMARY KEY,\n  fecha        DATE NOT NULL,\n  dni_cliente  CHAR(9) NOT NULL,\n  FOREIGN KEY (dni_cliente) REFERENCES cliente(dni)\n);'},
+ {id:'l14', t:'Del E/R dibujado al CREATE TABLE', tag:'del E/R a tablas', er:'veterinaria',
+  learn:`<p>Como en el examen: te dan un <b>E/R</b> y sacas las tablas.</p><ol class="plist"><li>Cada <b>rectángulo</b> → una tabla.</li><li><u>Subrayado</u> → clave primaria. Línea discontinua → opcional.</li><li>Relación <b>1:N</b> → la FK va en la tabla del lado «muchos» (el par con máximo 1 está en la entidad referenciada).</li><li>Mínimo <b>1</b> → NOT NULL en la FK; mínimo <b>0</b> → admite NULL.</li></ol>`,
+  task:'Pasa este E/R a tablas escribiendo los CREATE TABLE (el dueño de una mascota es obligatorio).',
+  hints:['Dos rectángulos → dos tablas: dueno y mascota (dueño primero).','La FK va en mascota y es NOT NULL (cada mascota tiene un dueño).'], sol:null},
+ {id:'l15', t:'Un esquema entero (base de datos + todas las tablas)', tag:'esquema entero', er:'academia', schema:true,
+  learn:`<p>En el examen hay que crear el <b>esquema entero</b>: primero la base de datos y luego <b>todas</b> las tablas del E/R.</p><pre class="code">DROP DATABASE IF EXISTS academia;\nCREATE DATABASE academia;\nUSE academia;\n\nCREATE TABLE ... ;   -- las que no dependen de otras\nCREATE TABLE ... ;   -- las que llevan FK, después</pre><ol class="plist"><li>Una tabla por rectángulo, una por cada N:M.</li><li>Primero las tablas a las que apuntan otras.</li></ol>`,
+  task:'Crea el esquema entero de este E/R: la base de datos <code>academia</code> (si existe, se elimina antes), selecciónala y crea todas las tablas con sus claves y FKs.',
+  extra:db => { const ev = db.events || []; return [{ok: ev.some(e => e.k === 'createdb'), label:'CREATE DATABASE', hint:'Empieza con DROP DATABASE IF EXISTS academia; CREATE DATABASE academia;'},{ok: ev.some(e => e.k === 'use'), label:'USE (seleccionar la base de datos)', hint:'Después del CREATE DATABASE: USE academia;'}]; },
+  hints:['4 tablas: persona, profesional, formacion e inscripcion (N:M con la fecha).','Orden: profesional y persona primero; formacion (apunta a profesional); inscripcion al final.','La FK de formacion al profesional es NOT NULL (cada formación tiene un único profesional).'], sol:null}
+];
+const colOf = (db, t, c) => { const tb = db.tables[String(t).toLowerCase()]; return tb && tb.cols.find(x => x.name.toLowerCase() === String(c).toLowerCase()); };
+let tl = null;
+const tdone = () => save.taller || (save.taller = {});
+function tallerHome() {
+  const d = tdone(), weak = save.tallerWeak || [], n = TL.filter(l => d[l.id]).length;
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.home()">← Plan</button></div><section class="hero"><h1>🧱 Taller: CREATE TABLE desde cero</h1>
+   <p>Una idea cada vez: leo 20 segundos, escribo mi código y el verificador me dice <b>qué línea falla y por qué</b>. Sin prisa.</p>
+   <div class="bar" style="width:100%;margin:6px 0"><i style="width:${Math.round(n / TL.length * 100)}%"></i></div><p class="small">${n} de ${TL.length} lecciones superadas</p>
+   <div class="row big"><button class="primary" onclick="BQA.tallerDiag()">🩺 ¿Qué parte me falla? (diagnóstico, 3 min)</button><button onclick="BQA.tallerOpen(${Math.max(0, TL.findIndex(l => !d[l.id]))})">▶ ${n ? 'Seguir' : 'Empezar'} por la lección ${Math.max(0, TL.findIndex(l => !d[l.id])) + 1}</button></div></section>
+   <ol class="plan">${TL.map((l, i) => `<li class="${d[l.id] ? 'dn' : ''}"><button onclick="BQA.tallerOpen(${i})"><span>${d[l.id] ? '✔' : (weak.includes(l.tag) ? '🔥' : i + 1)}</span> ${esc(l.t)} <small>${weak.includes(l.tag) ? 'te cuesta' : l.tag}</small></button></li>`).join('')}</ol>`);
+}
+function tallerOpen(i) {
+  const l = TL[i]; tl = {i, hint: 0, tries: 0, typed: ''};
+  const fig = l.er ? T2.erSvgFull(caseAny(l.er)) : '';
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.taller()">✕ Salir</button><span class="small">Lección ${i + 1}/${TL.length}</span></div>
+   <section class="qcard"><div class="qhead"><span class="tag">🧱 ${esc(l.tag)}</span></div><h2>${esc(l.t)}</h2>
+   <div class="statement"><h4>1) Aprende (20 segundos)</h4>${l.learn}</div>
+   <div class="statement"><h4>2) Ahora tú</h4>${fig}<p>${l.task}</p>
+   <textarea id="tlIn" class="editor" rows="${l.spec && l.spec.length > 2 ? 14 : 9}" spellcheck="false" placeholder="Escribe aquí tu CREATE TABLE…"></textarea>
+   <div class="row"><button class="primary" onclick="BQA.tallerCheck()">✓ Comprobar</button><button class="ghost" id="tlHint" onclick="BQA.tallerHint()">💡 Pista (0/${l.hints.length})</button>${l.sol ? '<button class="ghost" onclick="BQA.tallerSol()">👁 Ver solución</button>' : '<button class="ghost" onclick="BQA.tallerSol()">👁 Ver solución</button>'}</div>
+   <div id="tlHints"></div><div id="tlFb"></div></div>
+   <div class="row"><button class="ghost" onclick="BQA.taller()">← Lista</button>${i + 1 < TL.length ? `<button onclick="BQA.tallerOpen(${i + 1})">Siguiente lección →</button>` : ''}</div></section>`);
+}
+function tallerHint() { const l = TL[tl.i]; if (tl.hint < l.hints.length) tl.hint++; $('tlHints').innerHTML = l.hints.slice(0, tl.hint).map((h, i) => `<div class="hint">💡 ${i + 1}. ${h}</div>`).join(''); $('tlHint').textContent = `💡 Pista (${tl.hint}/${l.hints.length})`; }
+function tlSpecOf(l) { return l.er ? caseAny(l.er).tables : l.spec; }
+function tlSolution(l) { return l.sol || D.solutionDDL(tlSpecOf(l)); }
+function tallerSol() { const l = TL[tl.i]; $('tlFb').innerHTML = `<div class="feedback ko"><h3>👁 Solución</h3><pre class="code">${esc(l.er ? (l.schema ? dbHead(caseAny(l.er)) : '') + renderDdl(ddlModel(caseAny(l.er).tables)).map(x => x.text).join('\n') : l.sol)}</pre><p class="small">Cópiala en el cuadro y compárala con la tuya: ¿qué línea te faltaba?</p></div>`; }
+// comprueba un script contra el marco esperado (con sinónimos de nombre opcionales)
+function tlGrade(txt, spec, types, extra, loose, fixPlural) {
+  const db = SQLX.parseScript(txt), plurals = [];
+  if (fixPlural) spec.forEach(sp => { const key = sp.name.toLowerCase(); if (db.tables[key]) return; const cand = [key + 's', key + 'es'].find(k => db.tables[k]); if (!cand) return; const tb = db.tables[cand]; tb.name = key; db.tables[key] = tb; delete db.tables[cand]; db.order = db.order.map(k => k === cand ? key : k); Object.values(db.tables).forEach(t => t.fks.forEach(f => { if (f.ref.toLowerCase() === cand) f.ref = key; })); plurals.push(sp.name); });
+  if (loose) { Object.keys(loose).forEach(tn => { const t = db.tables[tn.toLowerCase()]; if (!t) return; Object.keys(loose[tn]).forEach(want => { const c = t.cols.find(x => loose[tn][want].includes(x.name.toLowerCase())); if (c) c.name = want; }); t.pk = t.pk.map(n => { const hit = Object.keys(loose[tn]).find(w => loose[tn][w].includes(n.toLowerCase())); return hit || n; }); }); }
+  const g = SQLX.gradeSchema(db, spec), fams = [];
+  (types || []).forEach(([t, c, f]) => { const col = colOf(db, t, c); if (col) fams.push({ok: col.family === f || (f === 'dec' && col.family === 'int' && false), label: `${t.toLowerCase()}.${c} del tipo adecuado (${{str: 'texto', int: 'entero', dec: 'decimal', date: 'fecha'}[f]})`, hint: `${c} debería ser ${{str: 'texto (VARCHAR/CHAR)', int: 'entero (INT)', dec: 'decimal (DECIMAL(8,2))', date: 'fecha (DATE)'}[f]}.`}); });
+  const ex = extra ? extra(db) : [];
+  return {db, g, plurals, extra: [...fams, ...ex]};
+}
+function tlFeedback(r) {
+  const checks = [...r.g.checks, ...r.extra], bad = checks.filter(c => !c.ok), syn = r.g.errors.filter(e => e.code === 'syntax');
+  const errs = r.g.errors.filter(e => e.code !== 'syntax');
+  return `${syn.length ? `<div class="feedback ko"><h3>Error de sintaxis</h3><ul class="errs">${syn.map(e => `<li class="bad">${esc(e.msg)}</li>`).join('')}</ul><p class="small">Revisa: comas entre columnas, paréntesis, el ; al final y que cada columna lleve nombre y tipo.</p></div>` : ''}
+   <ul class="errs mini">${checks.map(c => `<li class="${c.ok ? 'good' : 'bad'}">${c.ok ? '✔' : '✘'} ${esc(c.label)}${c.ok ? '' : '<br><small>' + esc(c.hint) + '</small>'}</li>`).join('')}</ul>
+   ${errs.length ? `<h4>Errores que MySQL daría</h4><ul class="errs">${errs.map(e => `<li class="bad">${esc(e.msg)}</li>`).join('')}</ul>` : ''}`;
+}
+function tallerCheck() {
+  const l = TL[tl.i], txt = $('tlIn').value; if (!txt.trim()) { $('tlFb').innerHTML = '<div class="feedback ko"><p>Escribe tu CREATE TABLE antes de comprobar.</p></div>'; return; }
+  tl.tries++; const r = tlGrade(txt, tlSpecOf(l), l.types, l.extra, l.loose), allOk = r.g.checks.concat(r.extra).every(c => c.ok) && !r.g.errors.length;
+  if (allOk) { tdone()[l.id] = true; save.xp += 25; persist(); }
+  $('tlFb').innerHTML = `<div class="feedback ${allOk ? 'ok' : 'ko'}"><h3>${allOk ? '✅ ¡Lección superada!' : 'Casi: mira lo que falta'}</h3>${tlFeedback(r)}${allOk ? '' : `<p class="small">Intento ${tl.tries}. Usa 💡 si te atascas.</p>`}${allOk && tl.i + 1 < TL.length ? `<div class="row"><button class="primary" onclick="BQA.tallerOpen(${tl.i + 1})">Siguiente lección →</button></div>` : ''}</div>`;
+}
+// ---------- diagnóstico ----------
+const DIAG = {id:'diag', name:'Diagnóstico: tienda', rules:['Una tienda guarda clientes, pedidos y productos.', 'Cliente: dni (lo identifica), nombre, email (no se repite) y teléfono (puede no tenerlo).', 'Pedido: número (identificador numérico), fecha. Cada pedido es de un único cliente (obligatorio).', 'Producto: código (lo identifica), nombre y precio.', 'Un pedido contiene varios productos y un producto está en varios pedidos; se guarda la cantidad.'],
+  er:{entities:[{n:'Cliente', attrs:[['dni','I'],['nombre',''],['email','a'],['telefono','o']]},{n:'Pedido', attrs:[['num_pedido','I'],['fecha','']]},{n:'Producto', attrs:[['cod_producto','I'],['nombre',''],['precio','']]}]},
+  rels:[BQ._R('Cliente','realiza','Pedido','11','0N'), BQ._R('Pedido','contiene','Producto','0N','1N',{attr:'cantidad'})],
+  tables:[BQ._T('CLIENTE = dni*, nombre!, email+!, telefono?'), BQ._T('PEDIDO = num_pedido*, fecha!, dni_cliente!->CLIENTE'), BQ._T('PRODUCTO = cod_producto*, nombre!, precio!'), BQ._T('LINEA_PEDIDO = num_pedido*->PEDIDO, cod_producto*->PRODUCTO, cantidad!')]};
+function tallerDiag() {
+  tl = {diag: true};
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.taller()">✕ Salir</button></div><section class="qcard"><div class="qhead"><span class="tag">🩺 DIAGNÓSTICO</span></div><h2>Pasa este E/R a CREATE TABLE</h2>
+   <div class="statement">${T2.erSvgFull(DIAG)}<details class="rules"><summary>Enunciado en texto</summary><ol class="prules">${DIAG.rules.map(r => `<li>${r}</li>`).join('')}</ol></details>
+   <p>Escribe todos los CREATE TABLE (sin consultas). Hazlo como puedas: <b>no pasa nada si falla</b>, es para saber qué practicar.</p>
+   <textarea id="tlIn" class="editor" rows="18" spellcheck="false" placeholder="CREATE TABLE …"></textarea>
+   <div class="row"><button class="primary" onclick="BQA.tallerDiagCheck()">🩺 Ver mi diagnóstico</button></div><div id="tlFb"></div></div></section>`);
+}
+function tallerDiagCheck() {
+  const txt = $('tlIn').value; if (!txt.trim()) { $('tlFb').innerHTML = '<div class="feedback ko"><p>Escribe algo primero.</p></div>'; return; }
+  const r = tlGrade(txt, DIAG.tables, [], null, {PEDIDO: {num_pedido: ['numero', 'id_pedido', 'id', 'num']}}, true), cat = {};
+  const bump = (k, ok) => { const c = cat[k] = cat[k] || {ok: 0, bad: 0}; ok ? c.ok++ : c.bad++; };
+  r.g.checks.forEach(c => { const L = c.label; bump(/^Tabla /.test(L) ? 'orden y nombres' : /^CP de/.test(L) ? 'clave primaria' : /^FK /.test(L) ? 'clave ajena' : /NOT NULL en/.test(L) ? 'obligatorios' : /admite NULL/.test(L) ? 'obligatorios' : /UNIQUE/.test(L) ? 'unique' : /existe/.test(L) ? 'estructura' : 'estructura', c.ok); });
+  r.plurals.forEach(() => bump('orden y nombres', false));
+  r.g.errors.forEach(e => bump(e.code === 'fkOrder' ? 'orden y nombres' : e.code === 'syntax' ? 'estructura' : e.code === 'multiPk' || e.code === 'pkNull' ? 'clave primaria' : /^fk/.test(e.code) ? 'clave ajena' : 'estructura', false));
+  const names = {'estructura': 'Estructura y tipos', 'clave primaria': 'Clave primaria', 'clave ajena': 'Clave ajena (FK)', 'obligatorios': 'Obligatorio / opcional (NOT NULL)', 'unique': 'UNIQUE', 'orden y nombres': 'Orden y nombres en singular'};
+  const weak = Object.keys(cat).filter(k => cat[k].bad); save.tallerWeak = weak; persist();
+  const rows = Object.keys(names).filter(k => cat[k]).map(k => { const c = cat[k], fl = TL.map((l, i) => [l, i]).filter(([l]) => l.tag === k || (k === 'estructura' && (l.tag === 'estructura' || l.tag === 'tipos'))); return `<li class="${c.bad ? 'bad' : 'good'}">${c.bad ? '✘' : '✔'} <b>${names[k]}</b> — ${c.ok} bien${c.bad ? `, ${c.bad} por mejorar` : ''}${c.bad ? `<br>${fl.map(([l, i]) => `<button class="ghost" onclick="BQA.tallerOpen(${i})">🔥 Lección ${i + 1}: ${esc(l.t)}</button>`).join(' ')}` : ''}</li>`; }).join('');
+  $('tlFb').innerHTML = `<div class="feedback ${weak.length ? 'ko' : 'ok'}"><h3>${weak.length ? '🩺 Tu mapa: esto es lo que toca practicar' : '🏆 ¡Lo tienes! Pasa a la ruta de papel'}</h3><ul class="errs">${rows}</ul><details class="rules"><summary>Ver el detalle línea a línea</summary>${tlFeedback(r)}</details><details class="rules"><summary>Ver una solución modelo</summary><pre class="code">${esc(renderDdl(ddlModel(DIAG.tables)).map(x => x.text).join('\n'))}</pre></details></div>`;
+}
