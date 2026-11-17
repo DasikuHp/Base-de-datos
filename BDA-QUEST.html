@@ -76,6 +76,9 @@ table.rt{font-size:14px}table.rt th,table.rt td{padding:3px 7px;text-align:left}
 .ersvg{width:100%;height:auto;background:#fff;border:2px solid #514a91;margin:6px 0}
 .errs.mini{margin:2px 0 6px;padding-left:14px}.errs.mini li{margin:3px 0;padding:2px 6px}.errs li small{color:#ffd0da}
 label.small{display:block;margin:8px 0 2px}
+.stepnow{display:flex;gap:12px;align-items:center;background:#1b1940;border:3px solid var(--gold);padding:12px;margin:8px 0;font-size:18px}.stepnow .uicon{font-size:36px}
+.plan{list-style:none;padding:0;margin:10px 0;display:grid;gap:6px}.plan li button{width:100%;text-align:left;font-size:15px}.plan li.dn button{opacity:.55;border-color:#79efbb}.plan li.now button{border-color:var(--gold);background:#3a2a10}.plan small{float:right;color:var(--muted)}
+.row.big button{font-size:18px;padding:14px 18px}
 @media (max-width:600px){body{font-size:16px}.brand small{display:none}.hero h1{font-size:22px}.match label{grid-template-columns:1fr}.stat{min-width:48px;padding:2px 5px}.stat small{display:none}.dl .why{padding-left:10px}}
 @media print{header,.crumb{display:none}body{background:#fff;color:#000}.block{border:1px solid #999;box-shadow:none;background:#fff;break-inside:avoid}.truco{background:#f4f4f4}.block h3{color:#000}}
 </style>
@@ -2353,7 +2356,7 @@ const pick = a => a[Math.floor(Math.random()*a.length)];
 const UNITS = D.UNITS, unitById = id => UNITS.find(u => u.id === id);
 const caseById = id => D.CASES.find(c => c.id === id);
 const KEY = 'bdaquest_v1';
-const fresh = () => ({xp:0, streak:0, best:0, done:0, right:0, fails:{}, recent:[], unit:{}, exams:[]});
+const fresh = () => ({plan:{}, xp:0, streak:0, best:0, done:0, right:0, fails:{}, recent:[], unit:{}, exams:[]});
 let save;
 try { save = {...fresh(), ...JSON.parse(localStorage.getItem(KEY) || '{}')}; } catch { save = fresh(); }
 function persist(){ try { localStorage.setItem(KEY, JSON.stringify(save)); } catch(e){} hud(); }
@@ -2656,19 +2659,52 @@ function hud(){
 function view(html){ $('main').innerHTML = html; window.scrollTo(0,0); $('main').focus({preventScroll:true}); }
 function unitPct(id){ const s = save.unit[id]; return s && s.done ? Math.round(s.right/s.done*100) : null; }
 
+
+// ---------- PLAN DE REPASO (modo examen mañana, pensado para TDAH) ----------
+const PLAN = [
+  {i:'🧠', t:'Calentar: chuleta de trucos', m:5, go:()=>{ cheats(); }, cheat:true},
+  {i:'◇', t:'E/R: festival de cine (examen real)', m:12, go:()=>casePart('festival',1)},
+  {i:'◇', t:'E/R: reflexiva con roles', m:8, go:()=>casePart('empresa',1)},
+  {i:'◇', t:'E/R: ternaria', m:8, go:()=>casePart('consultora',1)},
+  {i:'▤', t:'Paso a tablas: huerto del examen', m:10, go:()=>casePart('huertoex',2)},
+  {i:'▤', t:'Tablas + existencialidad (consultora)', m:10, go:()=>casePart('consultora',2)},
+  {i:'⌗', t:'DDL: validar y escribir desde cero', m:12, go:()=>casePart('festival',3)},
+  {i:'▶', t:'DML: 5 sentencias con error', m:10, go:()=>practice('dmlr')},
+  {i:'▶', t:'DML: escribir desde cero', m:10, go:()=>practice('dmlw')},
+  {i:'📝', t:'Simulacro final (examen completo)', m:30, go:()=>exam()}
+];
+let pomo = {end:0, t:null};
+function pomoTick(){ const b=$('tmBtn'); if(!b) return; const left=Math.max(0,pomo.end-Date.now()); if(!pomo.end){ b.textContent='⏱ 25'; return; }
+  const m=Math.floor(left/60000), sec=String(Math.floor(left%60000/1000)).padStart(2,'0'); b.textContent=`⏱ ${m}:${sec}`;
+  if(left===0){ clearInterval(pomo.t); pomo.end=0; b.textContent='⏱ 25'; alert('⏰ 25 minutos. Descansa 5 minutos: levántate, bebe agua. Luego vuelves.'); } }
+function pomoToggle(){ if(pomo.end){ clearInterval(pomo.t); pomo.end=0; pomoTick(); return; } pomo.end=Date.now()+25*60000; pomo.t=setInterval(pomoTick,1000); pomoTick(); }
+function planNext(){ const i = PLAN.findIndex((p,k) => !save.plan[k]); return i<0 ? -1 : i; }
+function planGo(i){ pendingPlan = i; PLAN[i].go(); if(PLAN[i].cheat){ save.plan[i]=true; persist(); pendingPlan=null; } }
 function home(){
+  const n = planNext(), done = Object.keys(save.plan).length, pct = Math.round(done/PLAN.length*100);
+  const cur = n<0 ? null : PLAN[n];
+  view(`<section class="hero"><h1>Plan para el examen</h1>
+   <div class="bar" style="width:100%;margin:6px 0"><i style="width:${pct}%"></i></div><p class="small">${done} de ${PLAN.length} pasos hechos</p>
+   ${cur ? `<div class="stepnow"><span class="uicon">${cur.i}</span><div><b>Paso ${n+1}: ${esc(cur.t)}</b><br><span class="small">≈ ${cur.m} min · una cosa cada vez</span></div></div>
+   <div class="row big"><button class="primary" onclick="BQA.planGo(${n})">▶ Empezar este paso</button><button class="ghost" onclick="BQA.planSkip(${n})">Saltar</button></div>` : `<h2>🏆 ¡Plan completado!</h2><div class="row big"><button class="primary" onclick="BQA.exam()">📝 Otro simulacro</button><button onclick="BQA.review()">♻ Repasar fallos</button></div>`}
+   <div class="row"><button class="ghost" id="tmBtn" onclick="BQA.pomo()">⏱ 25</button><span class="small">Temporizador de 25 min: cuando suene, 5 min de descanso.</span></div></section>
+   <ol class="plan">${PLAN.map((p,k)=>`<li class="${save.plan[k]?'dn':k===n?'now':''}"><button onclick="BQA.planGo(${k})"><span>${save.plan[k]?'✔':p.i}</span> ${esc(p.t)} <small>${p.m} min</small></button></li>`).join('')}</ol>
+   <details class="rules"><summary>Más opciones (todos los casos, temas, rondas)</summary><div id="moreBox"></div></details>`);
+  $('moreBox').innerHTML = homeFull(); pomoTick(); hud();
+}
+
+function homeFull(){
   const cards = UNITS.map(u => { const p = unitPct(u.id);
     return `<button class="ucard ${u.exam?'exam':''}" onclick="BQA.unit('${u.id}')"><span class="uicon">${u.icon}</span><span class="uname">${esc(u.name)}</span><span class="usub">${esc(u.subtitle)}</span><span class="ubadge">${u.exam?'EXAMEN':'APOYO'}</span><span class="upct">${p==null?'NUEVO':p+'%'}</span></button>`; }).join('');
   const cases = D.CASES.map(c => `<div class="case"><b>${esc(c.name)}</b><span class="small">${esc(c.from)}</span><div class="row"><button onclick="BQA.exam('${c.id}')" class="primary">Examen completo</button><button onclick="BQA.casePart('${c.id}',1)">1 · E/R</button><button onclick="BQA.casePart('${c.id}',2)">2 · Tablas</button><button onclick="BQA.casePart('${c.id}',3)">3 · DDL</button><button onclick="BQA.casePart('${c.id}',4)">4 · DML</button></div></div>`).join('');
   const last = save.exams.slice(-3).reverse().map(e => `<li>${esc(e.date)} · ${esc(e.name)}: <b>${e.total}%</b> (E/R ${e.p[0]}% · tablas ${e.p[1]}% · DDL ${e.p[2]}%${e.p[3]!==undefined?' · DML '+e.p[3]+'%':''})</li>`).join('');
-  view(`<section class="hero"><h1>BDA-QUEST</h1><p>El examen tiene <b>3 partes</b>: <b>1)</b> E/R conceptual · <b>2)</b> paso a tablas (claves y <b>restricciones de existencialidad</b>) · <b>3)</b> consultas: <b>DDL</b> de varias tablas (validar y escribir desde cero) y <b>DML</b> de una tabla (<b>5 sentencias con error</b> para revisar + <b>1 desde cero</b>). Tablas en <b>singular</b>; reflexivas con <b>rol</b>; ternarias.</p>
+  return (`<section class="hero"><h1>BDA-QUEST</h1><p>El examen tiene <b>3 partes</b>: <b>1)</b> E/R conceptual · <b>2)</b> paso a tablas (claves y <b>restricciones de existencialidad</b>) · <b>3)</b> consultas: <b>DDL</b> de varias tablas (validar y escribir desde cero) y <b>DML</b> de una tabla (<b>5 sentencias con error</b> para revisar + <b>1 desde cero</b>). Tablas en <b>singular</b>; reflexivas con <b>rol</b>; ternarias.</p>
    <div class="row big"><button class="primary" onclick="BQA.exam()">📝 Examen completo (3 partes)</button><button onclick="BQA.campaign('')">⚔ Ronda mixta</button><button onclick="BQA.review()">♻ Repasar fallos</button></div>
    <div class="row"><button onclick="BQA.practice('dmlr')">🔎 DML: 5 sentencias con error</button><button onclick="BQA.practice('dmlw')">⌨ DML: desde cero</button><button onclick="BQA.practice('ddlw')">🏗 DDL: desde cero</button><button onclick="BQA.practice('ddl')">🧪 DDL: validar y explicar</button></div>
    <div class="row"><button class="ghost" onclick="BQA.cheats()">🧠 Chuleta de trucos</button><button class="ghost" onclick="BQA.progress()">▤ Progreso</button></div>
    ${last?`<ul class="small hist">${last}</ul>`:''}</section>
    <h2 class="sec">Casos con formato de examen</h2><p class="small">Cada caso trae su enunciado y se puede hacer entero o por partes: <b>1 E/R</b> (entidades, atributos, (min,max), reflexiva/ternaria) · <b>2 Tablas</b> (claves + existencialidad) · <b>3 DDL</b> · <b>4 DML</b>.</p><div class="cases">${cases}</div>
    <h2 class="sec">Temas</h2><div class="ugrid">${cards}</div>`);
-  hud();
 }
 
 function unitView(id){
@@ -2730,7 +2766,8 @@ function buildRound(topic, n=10){
   save.recent = [...save.recent, ...out.map(q=>q.id)].slice(-60); persist();
   return shuffle(out);
 }
-function start(list, mode, title){ run = {list, i:0, right:0, score:0, xp:0, mode, title, fails:[], parts:{1:[0,0],2:[0,0],3:[0,0],4:[0,0]}}; task(); }
+let pendingPlan = null;
+function start(list, mode, title){ run = {plan:pendingPlan, list, i:0, right:0, score:0, xp:0, mode, title, fails:[], parts:{1:[0,0],2:[0,0],3:[0,0],4:[0,0]}}; pendingPlan = null; task(); }
 function campaign(topic){ start(buildRound(topic), 'ronda', topic ? unitById(topic).name : 'Ronda mixta'); }
 function review(){
   const ids = failIds();
@@ -2767,7 +2804,7 @@ function practice(kind){
 
 // ---------- pintar cada tarea ----------
 let st = {}; // estado de la pregunta actual
-function rulesBox(c, open){ return `<details class="rules" ${open?'open':''}><summary>📄 Enunciado: ${esc(c.name)} (toca para ${open?'ocultar':'ver'})</summary><ol>${c.rules.map(r=>`<li>${r}</li>`).join('')}</ol></details>`; }
+function rulesBox(c, open){ if(open && run && run.i>0 && run.list[run.i-1] && run.list[run.i-1].cs===c) open=false; return `<details class="rules" ${open?'open':''}><summary>📄 Enunciado: ${esc(c.name)} (toca para ${open?'ocultar':'ver'})</summary><ol>${c.rules.map(r=>`<li>${r}</li>`).join('')}</ol></details>`; }
 function task(){
   const q = run.list[run.i]; st = {q, answered:false};
   const u = unitById(q.topic);
@@ -2911,6 +2948,7 @@ function selfOk(){
 function next(){ run.i++; if(run.i < run.list.length) task(); else end(); }
 function end(){
   const n = run.list.length, pct = Math.round(run.score/n*100);
+  const planDone = run.plan!=null && pct>=0; if(planDone){ save.plan[run.plan]=true; persist(); }
   let extra = '';
   if(run.mode==='examen'){
     const p = [1,2,3,4].map(k => run.parts[k][1] ? Math.round(run.parts[k][0]/run.parts[k][1]*100) : 0);
@@ -2919,7 +2957,7 @@ function end(){
   }
   const fig = run.caseRef ? `<details class="rules"><summary>🖼 Así queda el E/R de «${esc(run.caseRef.name)}» (para comparar con tu dibujo)</summary>${run.caseRef.img ? `<img src="${run.caseRef.img}" alt="E/R" style="max-width:100%;background:#fff">` : T2.erSvg(run.caseRef)}<p class="small">Dibujo simplificado (sin atributos): par (min,max) pegado a cada entidad.</p></details>` : '';
   const fails = run.fails.length ? `<h3>Para repasar (ya están en ♻ Repasar fallos)</h3><ul class="flist">${run.fails.map(q=>`<li><b>${esc(q.title)}</b><br><span class="small">💡 ${esc(q.truco||'')}</span></li>`).join('')}</ul>` : '<p>¡Sin fallos en esta ronda!</p>';
-  view(`<section class="hero"><h1>${pct>=80?'🏆':pct>=50?'👍':'📚'} ${esc(run.title)}</h1><p>Nota: <b>${pct}%</b> · ${run.right}/${n} perfectas · +${run.xp} XP</p>${extra}${fig}${fails}<div class="row big"><button class="primary" onclick="BQA.home()">Inicio</button>${failIds().length?'<button onclick="BQA.review()">♻ Repasar fallos</button>':''}<button onclick="BQA.exam()">📝 Otro examen</button></div></section>`);
+  view(`<section class="hero"><h1>${pct>=80?'🏆':pct>=50?'👍':'📚'} ${esc(run.title)}</h1><p>Nota: <b>${pct}%</b> · ${run.right}/${n} perfectas · +${run.xp} XP</p>${extra}${fig}${fails}${planDone?'<p class="small">✔ Paso del plan hecho. 💧 Respira un minuto antes del siguiente.</p>':''}<div class="row big"><button class="primary" onclick="BQA.home()">${planDone?'Siguiente paso →':'Inicio'}</button>${failIds().length?'<button onclick="BQA.review()">♻ Repasar fallos</button>':''}<button onclick="BQA.exam()">📝 Otro examen</button></div></section>`);
 }
 function flash(msg){ $('fb').innerHTML = `<div class="feedback ko"><p>${esc(msg)}</p></div>`; }
 
@@ -2939,7 +2977,7 @@ function reset(){ if(confirm('¿Borrar todo el progreso y los fallos guardados?'
 
 // ---------- API para los botones ----------
 window.BQA = {
-  home, unit:unitView, campaign, review, exam, casePart, cheats, progress, reset, check, selfOk,
+  home, planGo, pomo:pomoToggle, planSkip(i){ save.plan[i]=true; persist(); home(); }, unit:unitView, campaign, review, exam, casePart, cheats, progress, reset, check, selfOk,
   quit(){ if(!run || confirm('¿Salir? Lo contestado ya cuenta para el progreso.')) home(); },
   opt(i){ if(st.answered) return; if(st.q.type==='multi'){ st.sel.has(i)?st.sel.delete(i):st.sel.add(i); } else { st.sel = new Set([i]); }
     document.querySelectorAll('.opt').forEach(b=>b.classList.toggle('on', st.sel.has(+b.dataset.i))); if(st.q.type==='choice') check(); },
