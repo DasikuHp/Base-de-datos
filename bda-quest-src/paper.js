@@ -112,7 +112,7 @@ function ddlModel(tables, names) {
     const pk = pkOf(t), groups = new Map();
     t.cols.filter(c => c[2]).forEach(c => { const k = c[2] + '#' + (c[4] || c[0]); if (!groups.has(k)) groups.set(k, {ref: c[2], cols: []}); groups.get(k).cols.push(c[0]); });
     const fks = [...groups.values()].map(g => { const R = byName(g.ref); return {cols: g.cols, ref: g.ref, refCols: (R ? pkOf(R) : ['id']).slice(0, g.cols.length)}; });
-    return {name: t.name, pk, fks, cols: t.cols.map(c => { const ty = typeOf(t, c); return {n: c[0], type: ty, auto: pk.length === 1 && pk[0] === c[0] && !c[2] && /INT/.test(ty) && /^id/.test(lcs(c[0])), nn: /V|P/.test(c[1]), uq: /A/.test(c[1]), opt: /o/.test(c[1])}; })};
+    return {name: t.name, pk, fks, cols: t.cols.map(c => { const ty = typeOf(t, c); return {n: c[0], isFk: !!c[2], type: ty, auto: pk.length === 1 && pk[0] === c[0] && !c[2] && /INT/.test(ty) && /^id/.test(lcs(c[0])), nn: /V|P/.test(c[1]), uq: /A/.test(c[1]), opt: /o/.test(c[1])}; })};
   });
 }
 function renderDdl(model) {
@@ -135,8 +135,8 @@ function mutateDdl(model, k) {
   const kinds = ['dropNN', 'addNN', 'dropUQ', 'dropFK', 'wrongFK', 'shortPk', 'noPk', 'plural', 'order', 'dupPk', 'dropNN', 'dropFK'];
   for (let tries = 0; tries < 60 && errors.length < k; tries++) {
     const kind = pick1(kinds), t = pick1(model), key = t.name;
-    if (kind === 'dropNN') { const cs = t.cols.filter(c => c.nn && !c.dropNN && !t.pk.includes(c.n) && !used.has(key + c.n)); if (!cs.length) continue; const c = pick1(cs); used.add(key + c.n); c.dropNN = true; add(c, `<code>${t.name}.${c.n}</code> es <b>obligatorio</b> (el enunciado no dice que pueda faltar): falta <b>NOT NULL</b>.`); }
-    else if (kind === 'addNN') { const cs = t.cols.filter(c => c.opt && !c.addNN && !used.has(key + c.n)); if (!cs.length) continue; const c = pick1(cs); used.add(key + c.n); c.addNN = true; add(c, `<code>${t.name}.${c.n}</code> es <b>opcional</b> (puede no tener valor): sobra el NOT NULL.`); }
+    if (kind === 'dropNN') { const cs = t.cols.filter(c => c.nn && !c.dropNN && !t.pk.includes(c.n) && !used.has(key + c.n)); if (!cs.length) continue; const c = pick1(cs); used.add(key + c.n); c.dropNN = true; add(c, c.isFk ? `<code>${t.name}.${c.n}</code> es una FK <b>obligatoria</b> (mínimo 1: siempre tiene su ${lcs(t.fks.find(f => f.cols.includes(c.n)).ref)}): falta <b>NOT NULL</b> (restricción de existencia).` : `<code>${t.name}.${c.n}</code> es <b>obligatorio</b> (el enunciado no dice que pueda faltar): falta <b>NOT NULL</b>.`); }
+    else if (kind === 'addNN') { const cs = t.cols.filter(c => c.opt && !c.addNN && !used.has(key + c.n)); if (!cs.length) continue; const c = pick1(cs); used.add(key + c.n); c.addNN = true; add(c, c.isFk ? `<code>${t.name}.${c.n}</code> es una FK <b>opcional</b> (mínimo 0: puede no tener ${lcs(t.fks.find(f => f.cols.includes(c.n)).ref)}): debe admitir NULL, sobra el NOT NULL.` : `<code>${t.name}.${c.n}</code> es <b>opcional</b> (puede no tener valor): sobra el NOT NULL.`); }
     else if (kind === 'dropUQ') { const cs = t.cols.filter(c => c.uq && !c.dropUQ && !used.has(key + c.n)); if (!cs.length) continue; const c = pick1(cs); used.add(key + c.n); c.dropUQ = true; add(c, `<code>${t.name}.${c.n}</code> es clave alternativa (no puede repetirse): falta <b>UNIQUE</b>.`); }
     else if (kind === 'dropFK') { const fs = t.fks.filter(f => !f.dropped && !f.wrong && !used.has(key + f.cols[0])); if (!fs.length) continue; const f = pick1(fs); used.add(key + f.cols[0]); f.dropped = true; const last = t.cols.find(c => c.n === f.cols[f.cols.length - 1]); add(last, `<b>Falta la FOREIGN KEY</b> <code>FOREIGN KEY (${f.cols.join(', ')}) REFERENCES ${lcs(f.ref)}(${f.refCols.join(', ')})</code> en ${t.name}.`); }
     else if (kind === 'wrongFK') { const fs = t.fks.filter(f => !f.dropped && !f.wrong && f.cols.length === 1 && !used.has(key + f.cols[0])); if (!fs.length) continue; const f = pick1(fs); const others = model.filter(x => x.name !== f.ref && x.name !== t.name && x.pk.length === 1); if (!others.length) continue; const o = pick1(others); used.add(key + f.cols[0]); f.wrong = o.name; f.wrongCols = o.pk.slice(0, 1); add(f, `La FK de <code>${t.name}.${f.cols[0]}</code> apunta a <b>la tabla equivocada</b> (<code>${lcs(o.name)}</code>): debe ser <code>REFERENCES ${lcs(f.ref)}(${f.refCols.join(', ')})</code>.`); }
@@ -168,6 +168,7 @@ function paperMeta(id) {
   if (k === 'ddlw' || k === 'ddlh') { const c = caseAny(rest), n = ddlNames(c, k === 'ddlh').length; return {title: `DDL ${k === 'ddlh' ? 'solo enunciado' : 'desde cero'} · ${c.name}`, level: k === 'ddlh' ? 3 : (c.level || 2), min: 2 + 2 * n}; }
   if (k === 'dmlr') { const t = D.DMLR.find(x => x.id === rest); return {title: `DML revisar · ${t.title}`, level: dmlLevel(t), min: 3}; }
   if (k === 'dmlw') { const t = D.DMLW.find(x => x.id === rest), l = dmlLevel(t); return {title: `DML desde cero · ${t.title}`, level: l, min: l === 1 ? 2 : l === 2 ? 4 : 6}; }
+  if (k === 'ddls') { const t = D.DDLS.find(x => x.id === rest); return {title: `DDL ${t.title}`, level: t.lvl, min: 3 + t.lvl * 2}; }
   if (k === 'norm') { const t = D.NORM.find(x => x.id === rest); return {title: `Normalización · ${t.title}`, level: /6[a-f]/.test(t.id) ? 1 : 3, min: /6[a-f]/.test(t.id) ? 3 : 8}; }
   if (k === 'card0') return {title: 'Cardinalidades (boletín 0)', level: 1, min: 8};
   if (k === 'card1') return {title: `Relámpago pares · ${+rest + 1}`, level: 1, min: 2};
@@ -181,7 +182,7 @@ function paperItem(id) {
   if (k === 'er') it = itemER(caseAny(rest)); else if (k === 'tab') it = itemTab(caseAny(rest)); else if (k === 'ddlv') it = itemDdlV(caseAny(rest)); else if (k === 'ddlg') it = itemDdlG(caseAny(rest));
   else if (k === 'ddlw') it = itemDdlW(caseAny(rest), false); else if (k === 'ddlh') it = itemDdlW(caseAny(rest), true);
   else if (k === 'dmlr') it = itemDmlR(D.DMLR.find(t => t.id === rest)); else if (k === 'dmlw') it = itemDmlW(D.DMLW.find(t => t.id === rest));
-  else if (k === 'norm') it = itemNorm(D.NORM.find(t => t.id === rest)); else if (k === 'card0') it = itemCard0(); else if (k === 'card1') it = itemCard1(+rest); else if (k === 'tab0') it = itemTab0(+rest);
+  else if (k === 'ddls') it = itemDdls(D.DDLS.find(t => t.id === rest)); else if (k === 'norm') it = itemNorm(D.NORM.find(t => t.id === rest)); else if (k === 'card0') it = itemCard0(); else if (k === 'card1') it = itemCard1(+rest); else if (k === 'tab0') it = itemTab0(+rest);
   const m = paperMeta(id); it.level = m.level; it.min = m.min; it.chuleta = chuletaFor(id); return it;
 }
 function itemER(c) {
@@ -257,6 +258,7 @@ function itemDmlW(t) {
     solution: `${refs.map((r, i) => `<p>${refs.length > 1 ? 'Opción ' + (i + 1) + ':' : '<b>Solución:</b>'}</p><pre class="code">${esc(r.replace(/;\s*/g, ';\n'))}</pre>`).join('')}<div class="dres"><b>Resultado esperado</b>${dmlResult(t.db, refs[0])}</div>${explainSql(refs[0])}`,
     rubric: ['Mi sentencia daría el mismo resultado (o equivalente)', 'Orden de cláusulas correcto y comillas/comas bien', ...(t.aliases ? ['Alias pedido: ' + esc(t.aliases.join(', '))] : [])]};
 }
+function itemDdls(t) { return {id: 'ddls:' + t.id, part: 3, title: `DDL: ${t.title}`, src: t.tags.join(' · '), statement: `<p>${t.q}</p><p>Escribe el DDL (solo CREATE TABLE / ALTER TABLE, sin consultas). Tablas en singular.</p>`, hints: t.hints, solution: `<pre class="code">${esc(t.sol)}</pre>`, rubric: t.rub}; }
 function itemNorm(t) { return {id: 'norm:' + t.id, part: 5, title: `Normalización · ${t.title}`, src: 'Boletín normalización', statement: `<p>${t.q}</p><p class="small">Notación DeMarco: <code>{ }</code> repetición · <code>[ ]</code> opcional · <code>( )</code> composición.</p>`, hints: t.hints, solution: t.sol, rubric: t.rub}; }
 function itemCard0() { return {id: 'card0', part: 1, title: 'Cardinalidades (boletín 0)', src: 'Boletín 0: Cardinalidades', statement: `<p>Representa las cardinalidades (par pegado a la entidad que se cuenta):</p><ol class="plist">${D.CARD0.map(x => `<li>${esc(x[0])}</li>`).join('')}</ol>`, hints: ['Pregúntate en cada frase: ¿puede existir uno SIN el otro? (mínimo) y ¿cuántos a la vez? (máximo).', 'Si la parte no existe sin el todo (vagón, ejemplar, municipio) → entidad débil.', '«Varios y varios» → N:M; si hay datos de la pareja (nota, cantidad) van en la relación.'], solution: `<ol class="plist">${D.CARD0.map(x => `<li>${x[1]}</li>`).join('')}</ol>`, rubric: D.CARD0.map((x, i) => `${i + 1}. ${esc(x[0].slice(0, 60))}`)}; }
 function itemCard1(i) { const x = D.CARD1[i]; return {id: 'card1:' + i, part: 1, title: `Relámpago pares · ${i + 1}`, src: '2 minutos', statement: `<p>${esc(x[0])}</p><p>Dibuja la relación con sus (min,max) (pegado a la entidad que se cuenta).</p>`, hints: ['¿Puede existir uno sin el otro? (mínimo 0 o 1) ¿Cuántos a la vez? (máximo 1 o N).', 'Escribe la frase al lado de cada par.'], solution: `<p>${x[1]}</p>`, rubric: ['Pares (min,max) bien colocados', 'Tipo de relación correcto', 'Detalle especial (rol / débil / aserción / ISA) si lo hay']}; }
@@ -264,19 +266,23 @@ function itemTab0(i) { const x = D.TAB0[i]; return {id: 'tab0:' + i, part: 2, ti
 
 // ---------- listas por sección ----------
 function paperSections() {
-  const withTables = ALLC().filter(c => c.tables), er = withTables.filter(c => c.id !== 'huertoex'), pcs = D.PCASES.map(c => c.id);
+  const withTables = ALLC().filter(c => c.tables), erIds = ['agencia', 'academia', ...withTables.filter(c => c.id !== 'huertoex' && c.id !== 'agencia' && c.id !== 'academia').map(c => c.id)];
+  const byLvl = ids => ids.map((id, i) => [id, paperMeta(id).level, i]).sort((x, y) => x[1] - y[1] || x[2] - y[2]).map(x => x[0]);
   return [
-    {k: 'er', t: '1 · E/R (conceptual)', ids: [...er.map(c => 'er:' + c.id), 'card0']},
-    {k: 'quick', t: '⚡ Relámpago (2-3 minutos)', ids: [...D.CARD1.map((_, i) => 'card1:' + i), ...D.TAB0.map((_, i) => 'tab0:' + i)]},
-    {k: 'tab', t: '2 · Paso a tablas + existencialidad', ids: withTables.map(c => 'tab:' + c.id)},
-    {k: 'ddlv', t: '3 · DDL: validar y explicar el porqué', ids: [...D.CASES.map(c => 'ddlv:' + c.id), ...withTables.map(c => 'ddlg:' + c.id)]},
-    {k: 'ddlw', t: '3 · DDL: escribir desde cero', ids: [...withTables.map(c => 'ddlw:' + c.id), ...withTables.filter(c => ddlNames(c, true).length).map(c => 'ddlh:' + c.id)]},
-    {k: 'dmlr', t: '3 · DML: revisar errores', ids: D.DMLR.map(t => 'dmlr:' + t.id)},
-    {k: 'dmlw', t: '3 · DML: desde cero (boletines y más)', ids: D.DMLW.map(t => 'dmlw:' + t.id)},
-    {k: 'norm', t: 'Normalización (boletín)', ids: D.NORM.map(t => 'norm:' + t.id)}];
+    {k: 'er', t: '1 · E/R (conceptual)', ids: erIds.map(i => 'er:' + i)},
+    {k: 'ddlw', t: '3 · DDL: escribir desde cero', ids: byLvl([...D.DDLS.map(t => 'ddls:' + t.id), ...withTables.filter(c => c.level === 1 || ddlNames(c, false).length).map(c => 'ddlw:' + c.id)])},
+    {k: 'ddlv', t: '3 · DDL: validar y explicar el porqué (enunciado E/R + DDL de varias tablas)', ids: byLvl([...D.CASES.map(c => 'ddlv:' + c.id), ...withTables.map(c => 'ddlg:' + c.id)])},
+    {k: 'dmlr', t: '3 · DML: revisar errores (de una tabla)', ids: byLvl(D.DMLR.map(t => 'dmlr:' + t.id))},
+    {k: 'dmlw', t: '3 · DML: desde cero (de una tabla)', ids: byLvl(D.DMLW.map(t => 'dmlw:' + t.id))}];
 }
 const paperTitle = id => paperMeta(id).title.replace(/^[^·]+· /, '');
 
+function paperTags(id) {
+  const k = id.split(':')[0], rest = id.split(':').slice(1).join(':'); let tags = [];
+  if (['ddlv', 'ddlg', 'ddlw', 'ddlh', 'er'].includes(k)) { const c = caseAny(rest); if (c) { if (c.rels.some(r => r.roles)) tags.push('reflexiva'); if (c.rels.some(r => r.ternary)) tags.push('ternaria'); if ((c.asserts || []).length) tags.push('existencia'); } }
+  if (k === 'ddls') tags = D.DDLS.find(x => x.id === rest).tags;
+  return tags.map(t => ` <span class="tag ghosttag">${t}</span>`).join('');
+}
 // ---------- pantallas ----------
 let pp = null, pFilter = 0;       // 0 todo · 1/2/3 nivel · 9 rápidos
 const passFilter = id => { const m = paperMeta(id); return pFilter === 0 || (pFilter === 9 ? m.min <= 4 : m.level === pFilter); };
@@ -284,7 +290,7 @@ function paperHome() {
   const secs = paperSections(), pc = save.paper || {};
   const dn = ids => ids.filter(i => pc[i] !== undefined).length;
   view(`<div class="crumb"><button class="ghost" onclick="BQA.home()">← Plan</button></div><section class="hero"><h1>✏️ Modo papel</h1>
-   <p>El examen es en papel: aquí lees, lo haces en el folio, y cuando acabes pulsas ✅ Corregir para ver la solución y marcar lo que tenías bien. Si te atascas: 💡 Pista (de una en una). Hay ejercicios 🟢 fáciles, 🟡 medios y 🔴 difíciles, rápidos y densos.</p>
+   <p>El examen es en papel: aquí lees, lo haces en el folio, y cuando acabes pulsas ✅ Corregir para ver la solución y marcar lo que tenías bien. Si te atascas: 💡 Pista (de una en una). Sale primero lo más simple (🟢) y después lo más denso (🔴). El examen: E/R · DDL (validar con campo libre y escribir desde cero, sin consultas) · DML de una tabla (5 sentencias con error + 1 desde cero).</p>
    <div class="row big"><button class="primary" onclick="BQA.paperExam()">📝 Simulacro en papel (examen completo)</button></div>
    <div class="row"><button class="ghost" onclick="BQA.paperPrint('')">🖨 Imprimir un examen (enunciados)</button><button class="ghost" onclick="BQA.paperPrint('sol')">🖨 …con soluciones</button></div></section>
    ${secs.map(s => `<button class="ucard" style="width:100%" onclick="BQA.paperList('${s.k}')"><span class="uicon">✏</span><span class="uname">${esc(s.t)}</span><span class="usub">${s.ids.length} ejercicios</span><span class="ubadge">PAPEL</span><span class="upct">${dn(s.ids)}/${s.ids.length}</span></button>`).join('<div style="height:8px"></div>')}`);
@@ -294,7 +300,7 @@ function paperList(k, f) {
   const s = paperSections().find(x => x.k === k), pc = save.paper || {}, ids = s.ids.filter(passFilter);
   const chips = [[0, 'Todos'], [1, '🟢 Fácil'], [2, '🟡 Media'], [3, '🔴 Difícil'], [9, '⚡ Rápidos (≤4 min)']].map(([v, n]) => `<button class="${pFilter === v ? 'primary' : 'ghost'}" onclick="BQA.paperList('${k}',${v})">${n}</button>`).join('');
   view(`<div class="crumb"><button class="ghost" onclick="BQA.paper()">← Modo papel</button></div><section class="hero"><h1>${esc(s.t)}</h1><div class="row">${chips}</div>${ids.length ? `<div class="row"><button class="primary" onclick="BQA.paperOpen('${k}',0)">▶ Empezar por el primero (${ids.length})</button></div>` : '<p>Ningún ejercicio con este filtro.</p>'}</section>
-   <div class="cases">${ids.map((id, i) => { const p = pc[id], m = paperMeta(id); return `<div class="case"><b>${esc(paperTitle(id))}</b> <span class="tag ghosttag">${lvlName(m.level)}</span> <span class="tag ghosttag">≈${m.min} min</span> ${p !== undefined ? `<span class="tag">${p}%</span>` : ''}<div class="row"><button onclick="BQA.paperOpen('${k}',${i})">Abrir</button></div></div>`; }).join('')}</div>`);
+   <div class="cases">${ids.map((id, i) => { const p = pc[id], m = paperMeta(id); return `<div class="case"><b>${esc(paperTitle(id))}</b> <span class="tag ghosttag">${lvlName(m.level)}</span> <span class="tag ghosttag">≈${m.min} min</span>${paperTags(id)} ${p !== undefined ? `<span class="tag">${p}%</span>` : ''}<div class="row"><button onclick="BQA.paperOpen('${k}',${i})">Abrir</button></div></div>`; }).join('')}</div>`);
 }
 function paperOpen(k, i, ids, title) {
   const s = k ? paperSections().find(x => x.k === k) : null;
@@ -336,13 +342,14 @@ function paperNext() {
    <div class="parts">${Object.keys(byPart).map(p => { const v = Math.round(byPart[p].reduce((a, b) => a + b, 0) / byPart[p].length); return `<div class="part"><b>${p == 5 ? 'Norm.' : 'Parte ' + p}</b><strong>${v}%</strong><i style="width:${v}%"></i></div>`; }).join('')}</div>
    <p class="small">Tu nota de cada ejercicio queda guardada en el listado.</p><div class="row big"><button class="primary" onclick="BQA.paper()">Modo papel</button><button onclick="BQA.home()">Plan</button></div></section>`);
 }
-function examIds(c) { return [`er:${c.id}`, `tab:${c.id}`, `ddlv:${c.id}`, `ddlw:${c.id}`, ...shuffle(D.DMLR).slice(0, 5).map(t => 'dmlr:' + t.id), 'dmlw:' + pick(D.DMLW).id]; }
+function examIds(c) { return [`er:${c.id}`, `ddlg:${c.id}`, `ddlw:${c.id}`, ...shuffle(D.DMLR.filter(t => dmlLevel(t) <= 2)).slice(0, 5).map(t => 'dmlr:' + t.id), 'dmlw:' + pick(D.DMLW.filter(t => dmlLevel(t) <= 2)).id]; }
+const examPool = () => ALLC().filter(c => c.tables && (c.level || 2) <= 2 && c.id !== 'huertoex');
 function paperExam(caseId) {
-  const pool = D.CASES.filter(c => c.id !== 'huertoex'), c = caseId ? caseAny(caseId) : pick(pool);
+  const c = caseId ? caseAny(caseId) : pick(examPool());
   paperOpen(null, 0, examIds(c), `Simulacro en papel · ${c.name}`);
 }
 function paperPrint(mode) {
-  const pool = D.CASES.filter(c => c.id !== 'huertoex'), c = pick(pool), its = examIds(c).map(paperItem);
+  const c = pick(examPool()), its = examIds(c).map(paperItem);
   view(`<div class="crumb"><button class="ghost" onclick="BQA.paper()">← Modo papel</button><button class="primary" onclick="window.print()">🖨 Imprimir / guardar PDF</button><button class="ghost" onclick="BQA.paperPrint('${mode}')">Otro examen</button></div>
-   <section class="block printsheet"><h3>Examen de práctica · ${esc(c.name)}</h3><p class="small">Parte 1: E/R · Parte 2: paso a tablas · Parte 3: DDL y DML. Convención de clase: (min,max) pegado a la entidad que se cuenta.</p>${its.map((it, n) => `<div class="pitem"><h4>${n + 1}. ${it.title}</h4><div class="statement">${it.statement}</div>${mode === 'sol' ? `<div class="psol"><b>Solución</b>${it.solution}</div>` : '<div class="lines"></div>'}</div>`).join('')}</section>`);
+   <section class="block printsheet"><h3>Examen de práctica · ${esc(c.name)}</h3><p class="small">Parte 1: E/R · Parte 3: DDL (validar y desde cero) y DML (5 con error + 1 desde cero). Convención de clase: (min,max) pegado a la entidad que se cuenta.</p>${its.map((it, n) => `<div class="pitem"><h4>${n + 1}. ${it.title}</h4><div class="statement">${it.statement}</div>${mode === 'sol' ? `<div class="psol"><b>Solución</b>${it.solution}</div>` : '<div class="lines"></div>'}</div>`).join('')}</section>`);
 }
