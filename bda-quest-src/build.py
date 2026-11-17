@@ -20,10 +20,10 @@ def inline_images(js: str) -> str:
         return f"img:'data:image/png;base64,{data}'"
     return re.sub(r"img:'(img/[^']+\.png)'", rep, js)
 
-DATA_FILES = ('units.js', 'units2.js', 'cases.js', 'cases2.js', 'bank.js', 'bank2.js', 'seeds.js', 'sqlcheck.js', 'sqlengine.js', 'ddlgen.js', 'dml.js')
+DATA_FILES = ('units.js', 'units2.js', 'cases.js', 'cases2.js', 'bank.js', 'bank2.js', 'seeds.js', 'sqlcheck.js', 'sqlengine.js', 'ddlgen.js', 'dml.js', 'paper-data.js')
 data = '\n'.join((SRC / f).read_text(encoding='utf-8') for f in DATA_FILES)
 data = inline_images(data)
-app = (SRC / 'app.js').read_text(encoding='utf-8').replace('/*TASKS2*/', (SRC / 'tasks2.js').read_text(encoding='utf-8'))
+app = (SRC / 'app.js').read_text(encoding='utf-8').replace('/*TASKS2*/', (SRC / 'tasks2.js').read_text(encoding='utf-8')).replace('/*PAPER*/', (SRC / 'paper.js').read_text(encoding='utf-8'))
 html = (SRC / 'template.html').read_text(encoding='utf-8')
 html = html.replace('/*DATA*/', data.replace('</script', '<\\/script')).replace('/*APP*/', app.replace('</script', '<\\/script'))
 out = ROOT / 'BDA-QUEST.html'

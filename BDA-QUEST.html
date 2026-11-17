@@ -79,6 +79,10 @@ label.small{display:block;margin:8px 0 2px}
 .stepnow{display:flex;gap:12px;align-items:center;background:#1b1940;border:3px solid var(--gold);padding:12px;margin:8px 0;font-size:18px}.stepnow .uicon{font-size:36px}
 .plan{list-style:none;padding:0;margin:10px 0;display:grid;gap:6px}.plan li button{width:100%;text-align:left;font-size:15px}.plan li.dn button{opacity:.55;border-color:#79efbb}.plan li.now button{border-color:var(--gold);background:#3a2a10}.plan small{float:right;color:var(--muted)}
 .row.big button{font-size:18px;padding:14px 18px}
+.statement{background:#17153a;border:2px solid #3f3a7a;padding:10px 12px;margin:8px 0}.statement ol,.plist,.prules{padding-left:20px;margin:6px 0}.plist li{margin:6px 0}
+.statement img{max-width:100%;background:#fff}.rub{display:grid;gap:6px;margin:8px 0}.rub label{display:flex;gap:10px;align-items:flex-start;background:#1b1940;border:2px solid #3f3a7a;padding:8px;cursor:pointer}.rub input{width:22px;height:22px;min-width:0;margin-top:2px;accent-color:#5de8ed}
+h4{color:var(--cyan);margin:12px 0 4px}.printsheet .pitem{border-top:2px solid #514a91;margin-top:14px;padding-top:6px}.printsheet .lines{height:160px;border:1px dashed #8f89c4;margin:8px 0}
+@media print{.statement{background:#fff;border:1px solid #999;color:#000}.pitem{break-inside:avoid-page}.psol{background:#f4f4f4;padding:6px}.code{background:#f4f4f4!important;color:#000!important}.hero,.qcard{background:#fff!important;border:0!important;color:#000}h4{color:#000}}
 @media (max-width:600px){body{font-size:16px}.brand small{display:none}.hero h1{font-size:22px}.match label{grid-template-columns:1fr}.stat{min-width:48px;padding:2px 5px}.stat small{display:none}.dl .why{padding-left:10px}}
 @media print{header,.crumb{display:none}body{background:#fff;color:#000}.block{border:1px solid #999;box-shadow:none;background:#fff;break-inside:avoid}.truco{background:#f4f4f4}.block h3{color:#000}}
 </style>
@@ -2343,6 +2347,218 @@ BQ.DMLR = [
 {id:'r-del-parent', db:'huerto', kind:'write', title:'Borrar un padre con hijos', prompt:'Debe eliminar al vecino con DNI 23456789B (que tiene una parcela).', bad:"DELETE FROM Vecino\nWHERE dni_vecino = '23456789B';", ref:["DELETE FROM Parcela WHERE dni_vecino = '23456789B'; DELETE FROM Vecino WHERE dni_vecino = '23456789B'"], why:[['parcela','hijo','hija','dependen','referencia'],['clave ajena','foreign','fk','restrict','integridad','antes','primero','no deja','no permite']], model:'El vecino tiene <b>parcelas</b> que lo referencian con una <b>clave ajena (RESTRICT)</b>: MySQL no deja borrar al «padre» mientras existan «hijos». Hay que borrar antes las parcelas (<code>DELETE FROM Parcela WHERE dni_vecino = \'23456789B\'</code>) y después el vecino.', truco:'Se borra primero lo que depende (hijos) y luego lo referenciado (padre).'},
 {id:'r-distinct', db:'huerto', kind:'select', title:'Valores repetidos', prompt:'Debe mostrar las orientaciones que existen en las parcelas, sin repetir, ordenadas.', bad:"SELECT orientacion\nFROM Parcela\nORDER BY orientacion;", ref:"SELECT DISTINCT orientacion FROM Parcela ORDER BY orientacion", why:[['distinct'],['repet','duplicad','varias veces','sin repetir']], model:'Falta <b>DISTINCT</b>: sin él, «Sur» sale tantas veces como parcelas hay con esa orientación. Se escribe <code>SELECT DISTINCT orientacion</code>.', truco:'"Sin repetir" / "distintos" → DISTINCT.'}
 ];
+
+// BDA-QUEST · contenido SOLO para el modo papel: E/R de los boletines (con solución propuesta),
+// cardinalidades, normalización y los DML de los boletines que faltaban.
+// Convención de clase: el par (min,max) va pegado a la entidad que se cuenta.
+window.BQ = window.BQ || {};
+(function () {
+const P = s => [s[0], s[1]];                         // '0N' -> ['0','N']
+const sing = {'0,1': 'como mucho 1', '1,1': 'exactamente 1', '0,N': '0 o varios', '1,N': '1 o varios'};
+const R = (a, verb, b, na, nb, extra) => Object.assign({a, verb, b, na: P(na), nb: P(nb), tipo: (na[1] === 'N' && nb[1] === 'N') ? 'N:M' : (na[1] === 'N' || nb[1] === 'N') ? '1:N' : '1:1',
+  why: `Junto a ${a}: ${sing[P(na).join()]} ${a.toLowerCase()} por cada ${b.toLowerCase()}. Junto a ${b}: ${sing[P(nb).join()]} ${b.toLowerCase()} por cada ${a.toLowerCase()}.`}, extra || {});
+// tablas en notación compacta:  NOMBRE = col*, col!, col?, col+!, col!->TABLA, col*->TABLA#grupo
+//   * CP · + C.Alt · ! obligatorio · ? opcional · ->T clave ajena (#n agrupa FKs compuestas)
+const T = line => { const [name, rest] = line.split(' = '); return {name: name.trim(), cols: rest.split(',').map(s => {
+  const m = /^\s*([A-Za-z0-9_]+)([*+!?]*)(?:->([A-Z_0-9]+)(?:#(\d))?)?\s*$/.exec(s); if (!m) throw new Error('col ' + s);
+  const f = m[2]; return [m[1], (f.includes('*') ? 'P' : '') + (f.includes('+') ? 'A' : '') + (f.includes('!') ? 'V' : '') + (f.includes('?') ? 'o' : ''), m[3], undefined, m[4]]; })}; };
+
+BQ.PCASES = [
+{id:'concesionario', name:'Concesionario de coches', from:'Boletín 1 E/R · ej. 4',
+ rules:['Clientes (a los que se compra y vende): CIF, nombre, teléfonos, calle, número, provincia y CP.',
+  'Coches: matrícula, marca, modelo, color, número de bastidor, año de fabricación, kilómetros y una lista de desperfectos.',
+  'Empleados de venta: DNI, nombre, fecha de nacimiento y de contratación, salario base y porcentaje de comisión.',
+  'Compra: se anota el empleado, el coche, el cliente que lo vende y la fecha (un mismo coche puede comprarse varias veces en fechas distintas).',
+  'A cada coche comprado se le pueden hacer reparaciones: se anotan las reparaciones, quién las realiza y su precio.',
+  'Venta: se anota el vendedor, el coche, el cliente que compra, la fecha y el precio (un mismo coche puede venderse varias veces).'],
+ er:{entities:[
+  {n:'Cliente', attrs:[['cif','I'],['nombre',''],['telefono','m'],['calle','c'],['numero','c'],['provincia','c'],['cp','c']]},
+  {n:'Coche', attrs:[['matricula','I'],['marca',''],['modelo',''],['color',''],['num_bastidor','a'],['anio_fabricacion',''],['kilometros',''],['desperfecto','m']]},
+  {n:'Empleado', attrs:[['dni','I'],['nombre',''],['fecha_nacimiento',''],['fecha_contratacion',''],['salario_base',''],['porcentaje_comision','']]},
+  {n:'Compra', attrs:[['id_compra','I'],['fecha','']]},
+  {n:'Venta', attrs:[['id_venta','I'],['fecha',''],['precio','']]},
+  {n:'Reparación', attrs:[['id_reparacion','I'],['descripcion',''],['realizada_por',''],['precio','']]}]},
+ rels:[R('Empleado','realiza','Compra','11','0N'), R('Coche','es comprado en','Compra','11','1N'), R('Cliente','vende en','Compra','11','0N'),
+  R('Empleado','realiza','Venta','11','0N'), R('Coche','es vendido en','Venta','11','0N'), R('Cliente','compra en','Venta','11','0N'), R('Coche','recibe','Reparación','11','0N')],
+ asserts:[{t:'COCHE[matricula] ⊆ COMPRA[matricula]', why:'Todo coche del concesionario se ha comprado al menos una vez (mínimo 1 en Compra).'}],
+ extra:['<b>Compra y Venta son entidades</b> (con identificador propio) y no relaciones: el mismo coche se compra o se vende varias veces en fechas distintas, y una relación N:M no permitiría repetir la pareja.','Desperfectos y teléfonos son <b>multivalorados</b> (doble óvalo). La dirección del cliente es un atributo <b>compuesto</b>.'],
+ tables:[T('CLIENTE = cif*, nombre!, calle!, numero!, provincia!, cp!'), T('TELEFONO_CLIENTE = cif*->CLIENTE, telefono*'),
+  T('COCHE = matricula*, marca!, modelo!, color!, num_bastidor+!, anio_fabricacion!, kilometros!'), T('DESPERFECTO = matricula*->COCHE, desperfecto*'),
+  T('EMPLEADO = dni*, nombre!, fecha_nacimiento!, fecha_contratacion!, salario_base!, porcentaje_comision!'),
+  T('COMPRA = id_compra*, fecha!, dni_empleado!->EMPLEADO, matricula!->COCHE, cif_cliente!->CLIENTE'),
+  T('VENTA = id_venta*, fecha!, precio!, dni_empleado!->EMPLEADO, matricula!->COCHE, cif_cliente!->CLIENTE'),
+  T('REPARACION = id_reparacion*, descripcion!, realizada_por!, precio!, matricula!->COCHE')]},
+
+{id:'agencia', name:'Agencia de viajes', from:'Boletín 1 E/R · ej. 5',
+ rules:['Los clientes reservan viajes. La reserva tiene identificador único, las plazas reservadas, el tiempo total para llegar y la compañía.',
+  'El viaje reservado tiene ciudad de origen y de destino. Cada viaje se realiza como mínimo en un vuelo, aunque puede tener varios.',
+  'De cada vuelo: IATA (compañía), fecha y hora de salida prevista de un aeropuerto, fecha y hora de llegada prevista a otro aeropuerto, y el avión que lo realiza.',
+  'Los aeropuertos tienen código único, nombre, localidad y país. Los aviones: compañía, código y número de plazas.',
+  'Un vuelo lo realiza un único avión, pero un avión puede realizar otros vuelos.',
+  'Cada reserva es de un único cliente: dni, nombre, apellidos, dirección, teléfono y forma de pago (visa, paypal...) con número de tarjeta.'],
+ er:{entities:[
+  {n:'Cliente', attrs:[['dni','I'],['nombre',''],['apellidos',''],['direccion',''],['telefono',''],['forma_pago',''],['num_tarjeta','o']]},
+  {n:'Reserva', attrs:[['id_reserva','I'],['plazas',''],['tiempo_total',''],['compania','']]},
+  {n:'Viaje', attrs:[['id_viaje','I'],['ciudad_origen',''],['ciudad_destino','']]},
+  {n:'Vuelo', attrs:[['id_vuelo','I'],['iata',''],['fecha_hora_salida',''],['fecha_hora_llegada','']]},
+  {n:'Aeropuerto', attrs:[['codigo','I'],['nombre',''],['localidad',''],['pais','']]},
+  {n:'Avión', attrs:[['codigo_avion','I'],['compania',''],['num_plazas','']]}]},
+ rels:[R('Cliente','realiza','Reserva','11','0N'), R('Viaje','se reserva en','Reserva','11','0N'), R('Viaje','se realiza en','Vuelo','11','1N'),
+  R('Aeropuerto','es origen de','Vuelo','11','0N'), R('Aeropuerto','es destino de','Vuelo','11','0N'), R('Avión','realiza','Vuelo','11','0N')],
+ asserts:[{t:'VIAJE[id_viaje] ⊆ VUELO[id_viaje]', why:'"Cada viaje se realiza como mínimo en un vuelo" → mínimo 1: todo viaje aparece en VUELO.'}],
+ extra:['<b>Dos relaciones</b> distintas entre Vuelo y Aeropuerto (origen y destino): no se pueden fundir en una.','Si lees que un vuelo sirve a varios viajes, Viaje–Vuelo sería N:M (tabla intermedia). Aquí se elige 1:N porque el enunciado habla de "los vuelos de un viaje".'],
+ tables:[T('CLIENTE = dni*, nombre!, apellidos!, direccion!, telefono!, forma_pago!, num_tarjeta?'), T('VIAJE = id_viaje*, ciudad_origen!, ciudad_destino!'),
+  T('RESERVA = id_reserva*, plazas!, tiempo_total!, compania!, dni_cliente!->CLIENTE, id_viaje!->VIAJE'), T('AEROPUERTO = codigo*, nombre!, localidad!, pais!'),
+  T('AVION = codigo_avion*, compania!, num_plazas!'),
+  T('VUELO = id_vuelo*, iata!, fecha_hora_salida!, fecha_hora_llegada!, id_viaje!->VIAJE, aeropuerto_salida!->AEROPUERTO, aeropuerto_llegada!->AEROPUERTO, codigo_avion!->AVION')]},
+
+{id:'comidas', name:'Empresa de comidas', from:'Boletín 2 · DER 1',
+ rules:['Empleados: nombre y apellidos, DNI, nº de Seguridad Social, teléfono fijo y móvil.',
+  'Algunos empleados son cocineros (años de servicio) y otros pinches (fecha de nacimiento). La mayoría no son ni lo uno ni lo otro.',
+  'Cada plato: nombre, precio, tipo (entrante, primero, segundo, postre) y los ingredientes que lleva con la cantidad y para cuántas personas.',
+  'Cada almacén: número, nombre y descripción. Cada estante se identifica con dos letras y un tamaño en cm; dos almacenes distintos pueden tener estantes con las mismas letras.',
+  'Hay que saber qué cocineros pueden preparar cada plato. Cada pinche está a cargo de un cocinero.',
+  'Se guarda cuántas unidades de cada ingrediente hay en cada estante (se actualiza al instante).'],
+ er:{entities:[
+  {n:'Empleado', attrs:[['dni','I'],['nombre','c'],['apellidos','c'],['num_ss','a'],['telefono_fijo','o'],['movil','o']]},
+  {n:'Cocinero', attrs:[['anios_servicio','']]}, {n:'Pinche', attrs:[['fecha_nacimiento','']]},
+  {n:'Plato', attrs:[['id_plato','I'],['nombre',''],['precio',''],['tipo',''],['personas','']]},
+  {n:'Ingrediente', attrs:[['id_ingrediente','I'],['nombre','']]},
+  {n:'Almacén', attrs:[['num_almacen','I'],['nombre',''],['descripcion','']]},
+  {n:'Estante', attrs:[['letras','p'],['tamano_cm','']]}]},
+ rels:[R('Plato','lleva','Ingrediente','0N','1N',{attr:'cantidad'}), R('Cocinero','puede preparar','Plato','0N','0N'),
+  R('Cocinero','está a cargo de','Pinche','11','0N'), R('Almacén','contiene','Estante','11','0N'), R('Ingrediente','se guarda en','Estante','0N','0N',{attr:'cantidad'})],
+ asserts:[],
+ extra:['<b>ISA</b> Empleado → Cocinero | Pinche: <b>parcial</b> ("la mayoría no son ni lo uno ni lo otro") y <b>disyunta</b> (nadie es las dos cosas).','<b>Estante es entidad débil</b> de Almacén: su identificador es (num_almacen + letras); clave parcial = letras (discontinuo), relación identificadora con doble rombo.','Ingrediente–Estante es N:M con atributo <b>cantidad</b> (las unidades en cada estante).'],
+ tables:[T('EMPLEADO = dni*, nombre!, apellidos!, num_ss+!, telefono_fijo?, movil?'), T('COCINERO = dni*->EMPLEADO, anios_servicio!'),
+  T('PINCHE = dni*->EMPLEADO, fecha_nacimiento!, dni_cocinero!->COCINERO'), T('PLATO = id_plato*, nombre!, precio!, tipo!, personas!'), T('INGREDIENTE = id_ingrediente*, nombre!'),
+  T('PLATO_INGREDIENTE = id_plato*->PLATO, id_ingrediente*->INGREDIENTE, cantidad!'), T('COCINERO_PLATO = dni_cocinero*->COCINERO, id_plato*->PLATO'),
+  T('ALMACEN = num_almacen*, nombre!, descripcion!'), T('ESTANTE = num_almacen*->ALMACEN, letras*, tamano_cm!'),
+  T('ESTANTE_INGREDIENTE = num_almacen*->ESTANTE#1, letras*->ESTANTE#1, id_ingrediente*->INGREDIENTE, cantidad!')]},
+
+{id:'escolar', name:'Centro escolar de FP', from:'Boletín 2 · DER 2',
+ rules:['Solo interesa el control de ocupación de las aulas en el horario escolar: 6 horas diarias; se anota la hora (primera, segunda...) y el día de la semana.',
+  'Asignaturas: nombre, código interno del centro y código europeo. La misma asignatura en dos ciclos tiene el mismo nombre y código europeo, pero distinto código interno. Hace falta saber en qué curso del ciclo se imparte.',
+  'Ciclos: nombre, grado (superior, medio o iniciación profesional) y código interno.',
+  'Aulas: código, nombre (no se repite), número (no se repite) y metros. A una hora concreta el aula puede estar vacía u ocupada por UNA sola asignatura.',
+  'Una asignatura puede exigir haber aprobado otras antes (más de una).',
+  'Cada asignatura la imparte un único profesor titular todo el año. Profesores: nombre, dirección, teléfono, email, DNI, nº de SS, código interno y los años de antigüedad impartiendo cada asignatura. Un profesor puede ser tutor de un curso y se anota su antigüedad como tutor.'],
+ er:{entities:[
+  {n:'Aula', attrs:[['cod_aula','I'],['nombre','a'],['num_aula','a'],['metros','']]},
+  {n:'Franja', attrs:[['dia','p'],['hora','p']]},
+  {n:'Asignatura', attrs:[['cod_interno','I'],['nombre',''],['cod_europeo','']]},
+  {n:'Ciclo', attrs:[['cod_ciclo','I'],['nombre',''],['grado','']]},
+  {n:'Profesor', attrs:[['cod_profesor','I'],['nombre',''],['direccion',''],['telefono',''],['email',''],['dni','a'],['num_ss','a']]}]},
+ rels:[{verb:'ocupa', ternary:[{e:'Aula', m:['0','N']},{e:'Franja', m:['0','N']},{e:'Asignatura', m:['0','N']}], tipo:'N:M:N', why:'Ternaria: en una franja concreta, un aula tiene como mucho UNA asignatura. Por eso la CP es (aula, franja) y la asignatura queda como columna.'},
+  R('Ciclo','incluye','Asignatura','11','1N',{attr:'curso'}), R('Asignatura','requiere','Asignatura','0N','0N',{roles:{a:'requisito',b:'requerida'}}),
+  R('Profesor','imparte','Asignatura','11','0N',{attr:'anios_imparte'}), R('Profesor','tutoriza','Ciclo','0N','01',{attr:'curso, anios_tutor'})],
+ asserts:[],
+ extra:['<b>Aula–Franja–Asignatura es una ternaria</b> con una restricción: (aula, franja) determina la asignatura. En tablas: OCUPACION(cod_aula, dia, hora, cod_interno) con CP (cod_aula, dia, hora).','<b>Reflexiva</b> Asignatura–Asignatura N:M con roles requisito / requerida → tabla REQUISITO con dos FKs a ASIGNATURA y CP compuesta.','Los atributos de las relaciones 1:N (curso, años) viajan al lado N (ASIGNATURA).'],
+ tables:[T('AULA = cod_aula*, nombre+!, num_aula+!, metros!'), T('FRANJA = dia*, hora*'), T('CICLO = cod_ciclo*, nombre!, grado!'),
+  T('PROFESOR = cod_profesor*, nombre!, direccion!, telefono!, email!, dni+!, num_ss+!'),
+  T('ASIGNATURA = cod_interno*, nombre!, cod_europeo!, cod_ciclo!->CICLO, curso!, cod_profesor!->PROFESOR, anios_imparte!'),
+  T('OCUPACION = cod_aula*->AULA, dia*->FRANJA#1, hora*->FRANJA#1, cod_interno!->ASIGNATURA'),
+  T('REQUISITO = cod_asignatura*->ASIGNATURA, cod_requisito*->ASIGNATURA'),
+  T('TUTORIA = cod_profesor*->PROFESOR, cod_ciclo!->CICLO, curso!, anios_tutor!')]},
+
+{id:'redsocial', name:'Red social', from:'Boletín 2 · DER 3',
+ rules:['Usuarios: identificador numérico, mail (no se repite), contraseña obligatoria de 8 caracteres como mínimo, nombre, apellidos, dirección, teléfono (varios) y foto de perfil.',
+  'Los usuarios tienen contactos (otros usuarios) y de cada contacto se guarda un comentario personal.',
+  'Los usuarios organizan sus contactos en grupos (nombre); un mismo contacto puede estar en varios grupos.',
+  'Cada usuario puede tener una lista de usuarios bloqueados.',
+  'Los usuarios publican comentarios: públicos, restringidos (solo contactos) o exclusivos (contacto o grupo destinatario). Con texto y, opcionalmente, contenido binario (I imagen, A audio, V vídeo) y fecha de creación.'],
+ er:{entities:[
+  {n:'Usuario', attrs:[['id_usuario','I'],['mail','a'],['contrasena',''],['nombre',''],['apellidos',''],['direccion',''],['telefono','m'],['foto_perfil','o']]},
+  {n:'Grupo', attrs:[['id_grupo','I'],['nombre','']]},
+  {n:'Comentario', attrs:[['id_comentario','I'],['texto',''],['tipo_contenido','o'],['contenido','o'],['fecha_creacion',''],['visibilidad','']]}]},
+ rels:[R('Usuario','tiene como contacto','Usuario','0N','0N',{roles:{a:'propietario',b:'contacto'},attr:'comentario'}), R('Usuario','bloquea','Usuario','0N','0N',{roles:{a:'bloqueador',b:'bloqueado'}}),
+  R('Usuario','organiza','Grupo','11','0N'), R('Grupo','incluye','Usuario','0N','0N'), R('Usuario','publica','Comentario','11','0N'),
+  R('Comentario','se dirige a','Usuario','0N','0N'), R('Comentario','se dirige a','Grupo','0N','0N')],
+ asserts:[],
+ extra:['<b>Dos reflexivas</b> N:M sobre Usuario (contactos y bloqueos): cada una necesita sus <b>roles</b>. La de contactos lleva el atributo <b>comentario</b>.','Teléfonos: <b>multivalorado</b>. La contraseña de 8 caracteres mínimo es una restricción de dominio (CHECK).','Los destinatarios solo existen en los comentarios exclusivos: relaciones opcionales (0,N).'],
+ tables:[T('USUARIO = id_usuario*, mail+!, contrasena!, nombre!, apellidos!, direccion!, foto_perfil?'), T('TELEFONO_USUARIO = id_usuario*->USUARIO, telefono*'),
+  T('CONTACTO = id_usuario*->USUARIO, id_contacto*->USUARIO, comentario?'), T('BLOQUEO = id_usuario*->USUARIO, id_bloqueado*->USUARIO'),
+  T('GRUPO = id_grupo*, nombre!, id_usuario!->USUARIO'), T('GRUPO_CONTACTO = id_grupo*->GRUPO, id_contacto*->USUARIO'),
+  T('COMENTARIO = id_comentario*, texto!, tipo_contenido?, contenido?, fecha_creacion!, visibilidad!, id_usuario!->USUARIO'),
+  T('DESTINATARIO_USUARIO = id_comentario*->COMENTARIO, id_destinatario*->USUARIO'), T('DESTINATARIO_GRUPO = id_comentario*->COMENTARIO, id_grupo*->GRUPO')]},
+
+{id:'piezas', name:'Piezas de ferretería (almacenes)', from:'Boletín normalización · ej. 3 (a y b)',
+ rules:['Cada pieza: nombre, descripción y precio de venta. Se identifica con cuatro letras (tipo de pieza) y un número de modelo de 4 dígitos (TUER0006). Un mismo tipo siempre tiene el mismo nombre, aunque distinta descripción.',
+  'Una pieza (la principal) puede estar formada por otras piezas en cierta cantidad, y viceversa (el TORN0006 se usa en una visagra y en pomos).',
+  'Varios almacenes: identificador numérico, descripción y dirección postal.',
+  'Cada almacén puede contener varias estanterías, identificadas por un código numérico, con posición, número de estantes, peso máximo y % de espacio libre. Una estantería está forzosamente en un almacén.',
+  'Una estantería puede almacenar varias piezas, pero cada pieza está en una única estantería. Se anota la cantidad almacenada de cada pieza.'],
+ er:{entities:[
+  {n:'Tipo de pieza', attrs:[['tipo','I'],['nombre','']]},
+  {n:'Pieza', attrs:[['modelo','p'],['descripcion',''],['precio','']]},
+  {n:'Almacén', attrs:[['id_almacen','I'],['descripcion',''],['direccion','']]},
+  {n:'Estantería', attrs:[['cod_estanteria','I'],['posicion',''],['num_estantes',''],['peso_max',''],['pct_libre','']]}]},
+ rels:[R('Tipo de pieza','clasifica','Pieza','11','1N'), R('Pieza','está formada por','Pieza','0N','0N',{roles:{a:'principal',b:'componente'},attr:'cantidad'}),
+  R('Almacén','contiene','Estantería','11','0N'), R('Estantería','almacena','Pieza','11','0N',{attr:'cantidad'})],
+ asserts:[],
+ extra:['<b>Pieza es entidad débil</b> de Tipo de pieza: su identificador es (tipo + modelo); clave parcial = modelo. Sacar el nombre a Tipo de pieza evita la dependencia tipo → nombre.','<b>Reflexiva N:M</b> con roles principal / componente y atributo cantidad.','En la relación 1:N Estantería–Pieza, la <b>cantidad</b> viaja a PIEZA (lado N).'],
+ tables:[T('TIPO_PIEZA = tipo*, nombre!'), T('ALMACEN = id_almacen*, descripcion!, direccion!'), T('ESTANTERIA = cod_estanteria*, posicion!, num_estantes!, peso_max!, pct_libre!, id_almacen!->ALMACEN'),
+  T('PIEZA = tipo*->TIPO_PIEZA, modelo*, descripcion!, precio!, cod_estanteria!->ESTANTERIA, cantidad!'),
+  T('COMPOSICION = tipo_principal*->PIEZA#1, modelo_principal*->PIEZA#1, tipo_componente*->PIEZA#2, modelo_componente*->PIEZA#2, cantidad!')]}
+];
+
+// ---------- cardinalidades (Boletín 0) ----------
+BQ.CARD0 = [
+ ['Un tren contiene vagones.', 'Tren (1,1) — contiene — (1,N) Vagón. El vagón no existe sin el tren: entidad <b>débil</b> (doble rectángulo, rombo doble).'],
+ ['Un libro tiene ejemplares.', 'Libro (1,1) — tiene — (1,N) Ejemplar. Ejemplar es débil (num_ejemplar = clave parcial).'],
+ ['Una provincia está compuesta por municipios.', 'Provincia (1,1) — compuesta por — (1,N) Municipio. Municipio débil de Provincia.'],
+ ['Un coche tiene matrícula.', 'Mejor: <b>matrícula es un atributo</b> de Coche (identificador o alternativa). Como relación sería Coche (1,1) — (1,1) Matrícula (1:1).'],
+ ['Un autor escribe libros.', 'Autor (1,N) — escribe — (1,N) Libro: <b>N:M</b> (un libro puede tener varios autores).'],
+ ['Un cliente realiza pedidos.', 'Cliente (1,1) — realiza — (0,N) Pedido: 1:N. Un cliente puede no tener pedidos; cada pedido es de exactamente un cliente.'],
+ ['Tienda y trabajadores: la tienda es administrada por un trabajador.', 'Trabajador(<u>nº trabajador</u>, dni, nombre, apellidos) · Tienda(<u>cif</u>, nombre, dirección, m² <i>opcional</i>). Trabajador (1,1) — administra — (0,1) Tienda: cada tienda tiene exactamente un administrador y un trabajador administra como mucho una tienda.'],
+ ['Un proveedor suministra material para una fábrica de coches.', 'Proveedor(<u>cif</u>, nombre sociedad, dirección, email, teléfono) · Pieza(<u>referencia</u>, tamaño). Proveedor (0,N) — suministra — (0,N) Pieza: <b>N:M</b>. Si hubiera varias fábricas: ternaria con Fábrica.'],
+ ['Un médico atiende a varios pacientes y un paciente puede ser atendido por varios médicos. De cada consulta: fecha y diagnóstico.', 'Médico (0,N) — atiende — (0,N) Paciente: <b>N:M</b> con atributos fecha y diagnóstico. Si el mismo médico y paciente se ven varias veces, Consulta pasa a <b>entidad</b> (1,1)/(0,N) con cada uno.'],
+ ['Estudiante cursa módulo. ¿Cómo guardar la nota de cada alumno en cada módulo?', 'Estudiante (0,N) — cursa — (0,N) Módulo: N:M. La <b>nota</b> es un <b>atributo de la relación</b> (en tablas, en la tabla intermedia CURSA).']
+];
+
+// ---------- normalización (Boletín normalización) ----------
+BQ.NORM = [
+{id:'n-1', title:'Ej. 1 · hasta 1FN', q:'Normaliza hasta 1FN: <code>X = a0 + a1 + {x + y + z}</code>', hints:['1FN = valores atómicos: nada de grupos repetidos {…}.','El grupo repetido {x+y+z} sale a otra tabla.','La nueva tabla lleva la clave de X (a0) para poder volver.'],
+ sol:'<pre class="code">X1 = a0 + a1            CP(a0)\nX2 = a0 + x + y + z     CP(a0, x)   C.Aj(a0) → X1\n(si x no identifica cada repetición, CP(a0, x, y, z))</pre>', rub:['Saco el grupo repetido {x+y+z} a otra tabla','La nueva tabla incluye a0 como C.Aj hacia X1','CP de la nueva tabla compuesta con a0']},
+{id:'n-2', title:'Ej. 2 · hasta 2FN', q:'Normaliza hasta 2FN: <code>A = a0 + {a1 + a2} + c + d</code> con <code>DF = {a1 → a2, c → d}</code>', hints:['Primero 1FN: saca el grupo repetido.','2FN: ¿algún atributo depende solo de una PARTE de la clave compuesta?','a1 → a2 es dependencia parcial en la tabla del grupo.'],
+ sol:'<pre class="code">1FN:  A1 = a0 + c + d        CP(a0)\n      A2 = a0 + a1 + a2      CP(a0, a1)\n2FN:  A2a = a1 + a2          CP(a1)            (a1 → a2)\n      A2b = a0 + a1          CP(a0, a1)  C.Aj(a1) → A2a\n      A1 se queda (c → d es transitiva: eso es 3FN, no 2FN)</pre>', rub:['Hago 1FN sacando {a1+a2}','Detecto la dependencia parcial a1 → a2','Separo A2a(a1,a2) y A2b(a0,a1) con su C.Aj','No toco c → d (es de 3FN)']},
+{id:'n-3', title:'Ej. 3 (c y d) · DFs y FNBC de las piezas', q:'Con el esquema de <b>piezas de ferretería</b> (ver su E/R y tablas en la sección E/R): busca las dependencias funcionales no triviales y normaliza hasta FNBC.', hints:['Una DF por cada determinante: la clave de cada tabla y cualquier otro atributo que determine algo.','«Un mismo tipo siempre tiene el mismo nombre»: tipo → nombre.','Comprueba que todo determinante es clave en su tabla.'],
+ sol:'<pre class="code">DF:  tipo → nombre\n     (tipo, modelo) → descripcion, precio, cod_estanteria, cantidad\n     cod_estanteria → posicion, num_estantes, peso_max, pct_libre, id_almacen\n     id_almacen → descripcion, direccion\n     (tipo_p, modelo_p, tipo_c, modelo_c) → cantidad\nFNBC: TIPO_PIEZA(tipo, nombre) · PIEZA(tipo, modelo, descripcion, precio, cod_estanteria, cantidad)\n      ESTANTERIA(cod_estanteria, posicion, num_estantes, peso_max, pct_libre, id_almacen)\n      ALMACEN(id_almacen, descripcion, direccion) · COMPOSICION(...)\n(tipo → nombre ya está separada: PIEZA no repite el nombre)</pre>', rub:['Encuentro tipo → nombre','Encuentro cod_estanteria → … y id_almacen → …','Compruebo que todos los determinantes son clave']},
+{id:'n-4', title:'Ej. 4 · concurso enológico', q:'<pre class="code">CATADORES = dniCatador + nombre + experiencia + dnipareja\nVINOS = codBarras + añada + precio + bodega\nCOMPOSICIÓN = codBarras + tipoUva + porcentaje\nCATAS = dniCatador + CodBarras + notaAromas + notaSabor + tipoVino</pre>a) Deduce las DF. b) Normaliza hasta FNBC. c) ¿Puedes unificar tablas?', hints:['Una DF por tabla: la clave determina el resto.','¿De qué depende el tipoVino: del catador+vino o solo del vino?','Si depende solo de codBarras es una dependencia PARCIAL en CATAS.'],
+ sol:'<pre class="code">DF: dniCatador → nombre, experiencia, dnipareja\n    codBarras → añada, precio, bodega, tipoVino\n    (codBarras, tipoUva) → porcentaje\n    (dniCatador, codBarras) → notaAromas, notaSabor\nFNBC: CATADORES(dniCatador, nombre, experiencia, dnipareja)  C.Aj(dnipareja) → CATADORES\n      VINOS(codBarras, añada, precio, bodega, tipoVino)\n      COMPOSICION(codBarras, tipoUva, porcentaje)\n      CATAS(dniCatador, codBarras, notaAromas, notaSabor)\nc) tipoVino pasa de CATAS a VINOS (dependía solo de codBarras). Las demás tablas tienen claves distintas: no se unifican.</pre>', rub:['Escribo las 4 DF de las claves','Detecto codBarras → tipoVino (dependencia parcial en CATAS)','Muevo tipoVino a VINOS','Explico por qué no se unifican más tablas']},
+{id:'n-5', title:'Ej. 5 · alumnos de un IES', q:'<code>ALUMNO = Expediente + Nombre + Ape1 + Ape2 + DNI + NSS + calle + municipio + provincia + CP</code><br>a) Claves candidatas. b) Elige CP y alternativas. c) DFs. d) Hasta FNBC.', hints:['Candidata = identifica a cada alumno sin repetirse: ¿cuáles?','CP → municipio, provincia (un código postal pertenece a un municipio).','El determinante CP no es clave de ALUMNO: dependencia transitiva.'],
+ sol:'<pre class="code">a) Expediente, DNI, NSS\nb) CP(Expediente)  C.Alt(DNI)  C.Alt(NSS)\nc) Expediente → todo · DNI → todo · NSS → todo\n   CP → municipio, provincia · municipio → provincia\nd) ALUMNO(Expediente, Nombre, Ape1, Ape2, DNI, NSS, calle, CP)  C.Aj(CP)\n   CODIGO_POSTAL(CP, municipio)  C.Aj(municipio)\n   MUNICIPIO(municipio, provincia)</pre>', rub:['Las 3 claves candidatas','CP elegida y 2 alternativas','Detecto CP → municipio y municipio → provincia','Separo las tablas hasta FNBC']},
+{id:'n-6a', title:'Ej. 6a', q:'<code>ALUMNOS = expediente + nombre + apellido + {teléfono} + dirección</code>', hints:['Hay un grupo repetido: {teléfono}.'], sol:'<pre class="code">ALUMNOS(expediente, nombre, apellido, dirección)\nTELEFONOS(expediente, teléfono)   CP(expediente, teléfono)   C.Aj(expediente) → ALUMNOS</pre>', rub:['Saco {teléfono} a otra tabla','CP compuesta y C.Aj a ALUMNOS']},
+{id:'n-6b', title:'Ej. 6b', q:'<code>ALUMNOS = expediente + nombre + apellido + {asignatura + nota + curso + aula}</code> con <code>DF = {asignatura → curso, curso → aula}</code>', hints:['1FN: saca el grupo.','2FN: curso depende solo de asignatura (parte de la clave).','3FN: curso → aula es transitiva.'],
+ sol:'<pre class="code">ALUMNOS(expediente, nombre, apellido)\nNOTAS(expediente, asignatura, nota)      CP(expediente, asignatura)\nASIGNATURAS(asignatura, curso)           C.Aj(curso) → CURSOS\nCURSOS(curso, aula)</pre>', rub:['1FN: saco el grupo repetido','2FN: asignatura → curso sale de NOTAS','3FN: curso → aula en tabla aparte']},
+{id:'n-6c', title:'Ej. 6c', q:'<code>LIBROS = ISBN + título + editorial + país</code> (la editorial determina el país)', hints:['Dependencia transitiva: ISBN → editorial → país.'], sol:'<pre class="code">LIBROS(ISBN, título, editorial)   C.Aj(editorial) → EDITORIALES\nEDITORIALES(editorial, país)</pre>', rub:['Detecto editorial → país','Separo EDITORIALES']},
+{id:'n-6d', title:'Ej. 6d', q:'<code>PERSONAS = DNI + Nombre + Apellidos + Dirección + CP + Población + Provincia</code>', hints:['CP → población, provincia.'], sol:'<pre class="code">PERSONAS(DNI, Nombre, Apellidos, Dirección, CP)   C.Aj(CP) → CODIGOS_POSTALES\nCODIGOS_POSTALES(CP, Población, Provincia)</pre>', rub:['Detecto CP → población, provincia','Separo CODIGOS_POSTALES']},
+{id:'n-6e', title:'Ej. 6e', q:'<code>EMPLEADOS = DNI + NSS + Nombre + apellidos + departamento + puesto + salario</code>, C.Alt: NSS, <code>DF = {puesto → salario}</code>', hints:['puesto → salario: el determinante no es clave.'], sol:'<pre class="code">EMPLEADOS(DNI, NSS, Nombre, apellidos, departamento, puesto)   C.Alt(NSS)   C.Aj(puesto) → PUESTOS\nPUESTOS(puesto, salario)</pre>', rub:['Separo puesto → salario','Mantengo C.Alt(NSS)']},
+{id:'n-6f', title:'Ej. 6f', q:'<code>FIGURAS = nombre + color + tamaño</code>, C.Alt: color + tamaño, <code>DF = {tamaño → nombre}</code>', hints:['¿nombre forma parte de alguna clave candidata? Si sí, está en 3FN, pero no en FNBC.','FNBC: todo determinante debe ser clave.'], sol:'<pre class="code">3FN: ya cumple (nombre es atributo primo).\nFNBC: TAMAÑOS(tamaño, nombre)   FIGURAS(color, tamaño)   C.Aj(tamaño) → TAMAÑOS\n(se pierde la DF nombre+color → tamaño: es el caso clásico en que FNBC no conserva todas las DF)</pre>', rub:['Explico que está en 3FN pero no en FNBC','Separo TAMAÑOS(tamaño, nombre)','Comento la pérdida de una DF']},
+{id:'n-7', title:'Ej. 7 · ventas', q:'<code>VENTAS = fecha + vendedor + cliente + producto + NombreProducto + costeProducto + margenProducto + cantidadVendida + precioUnidad + importeBase + tipoIVA + %IVA + importeIVA + importeTotal + %comision + importeComision + ganancia</code><br>Cada vendedor tiene un único % de comisión; cada producto un único precio, coste y margen; cada tipo de IVA un único %. Se guardan los importes calculados por eficiencia. a) DFs. b) FNBC sin perder rendimiento.', hints:['Tres determinantes claros: vendedor, producto, tipoIVA.','Los importes calculados se quedan en VENTAS a propósito (rendimiento).'],
+ sol:'<pre class="code">DF: vendedor → %comision\n    producto → NombreProducto, costeProducto, margenProducto, precioUnidad\n    tipoIVA → %IVA\n    (fecha, vendedor, cliente, producto) → cantidadVendida, tipoIVA y los importes\nFNBC: VENDEDORES(vendedor, %comision)\n      PRODUCTOS(producto, NombreProducto, costeProducto, margenProducto, precioUnidad)\n      IVA(tipoIVA, %IVA)\n      VENTAS(fecha, vendedor, cliente, producto, cantidadVendida, importeBase, tipoIVA,\n             importeIVA, importeTotal, importeComision, ganancia)\nLos importes calculados se mantienen en VENTAS (desnormalización consciente).</pre>', rub:['Tres DF: vendedor, producto, tipoIVA','Separo VENDEDORES, PRODUCTOS e IVA','Mantengo los importes calculados en VENTAS y lo justifico']},
+{id:'n-8', title:'Ej. 8 · videoclub', q:'<code>AT = Película + Director + { Ejemplar + estado + {Fecha + Socio} }</code> con <code>DF = {Ejemplar → Película, Película → Director}</code>. Pasa a FNBC.', hints:['Hay dos grupos repetidos anidados.','Ejemplar → Película: cada ejemplar es de una película.'], sol:'<pre class="code">PELICULAS(Película, Director)\nEJEMPLARES(Ejemplar, Película, estado)     C.Aj(Película) → PELICULAS\nALQUILERES(Ejemplar, Fecha, Socio)         CP(Ejemplar, Fecha)   C.Aj(Ejemplar) → EJEMPLARES</pre>', rub:['Saco los dos grupos repetidos','PELICULAS(Película, Director)','EJEMPLARES con su C.Aj','ALQUILERES con CP (Ejemplar, Fecha)']}
+];
+
+// ---------- DML de los boletines que no estaban ----------
+BQ.DMLW.push(
+{id:'w-h-del4', db:'huerto', kind:'write', src:'Boletín 0 Huerto · ej. 7', title:'Elimina un monitor con talleres', prompt:'Elimina al monitor con DNI 33333333C. Ojo: imparte un taller. Escribe las sentencias necesarias.', ref:"DELETE FROM Taller WHERE dni_monitor = '33333333C'; DELETE FROM Monitor WHERE dni_monitor = '33333333C'", hints:['Taller tiene una FK RESTRICT hacia Monitor.','Primero los talleres del monitor (sus inscripciones caen en cascada), después el monitor.']},
+{id:'w-h-grp5', db:'huerto', kind:'select', src:'Boletín 0 Huerto II · ej. 4', title:'Media de parcela superior a 25', prompt:'Muestra los vecinos cuya superficie promedio por parcela es superior a 25 m²: dni_vecino, número de parcelas, metros promedio y metros totales. Ordena por metros promedio de mayor a menor.', ref:'SELECT dni_vecino, COUNT(*), AVG(metros), SUM(metros) FROM Parcela GROUP BY dni_vecino HAVING AVG(metros) > 25 ORDER BY AVG(metros) DESC', hints:['HAVING AVG(metros) > 25.']},
+{id:'w-h-grp6', db:'huerto', kind:'select', src:'Boletín 0 Huerto II · ej. 5', title:'Menor, mayor y diferencia', prompt:'Para los vecinos con más de 1 parcela muestra: dni_vecino, número de parcelas, tamaño de la más pequeña, de la más grande y la diferencia entre ambas. Ordena por diferencia de mayor a menor.', ref:'SELECT dni_vecino, COUNT(*), MIN(metros), MAX(metros), MAX(metros) - MIN(metros) FROM Parcela GROUP BY dni_vecino HAVING COUNT(*) > 1 ORDER BY MAX(metros) - MIN(metros) DESC', hints:['MIN, MAX y su resta en el SELECT; el filtro de la cuenta va en HAVING.']},
+{id:'w-c-agg5', db:'ciclismo', kind:'select', src:'Boletín 1 Ciclismo · ej. 2', title:'Edad mínima', prompt:'Obtén la edad mínima de los ciclistas.', ref:'SELECT MIN(edad) FROM ciclista', hints:['MIN(edad).']},
+{id:'w-c-agg6', db:'ciclismo', kind:'select', src:'Boletín 1 Ciclismo · ej. 5', title:'Cuántos equipos', prompt:'Obtén cuántos equipos hay registrados.', ref:'SELECT COUNT(*) FROM equipo', hints:['COUNT(*) sobre equipo.']},
+{id:'w-c-agg7', db:'ciclismo', kind:'select', src:'Boletín 1 Ciclismo · ej. 7', title:'Distancia media', prompt:'Obtén la distancia media recorrida en las etapas.', ref:'SELECT AVG(km) FROM etapa', hints:['AVG(km).']},
+{id:'w-c-agg8', db:'ciclismo', kind:'select', src:'Boletín 1 Ciclismo · ej. 8', title:'Altura máxima de puertos', prompt:'Obtén la altura máxima de los puertos.', ref:'SELECT MAX(altura) FROM puerto', hints:['MAX(altura).']},
+{id:'w-c-agg9', db:'ciclismo', kind:'select', src:'Boletín 1 Ciclismo · ej. 9', title:'Premio total de los maillots', prompt:'Obtén el premio total ofrecido por todos los maillots.', ref:'SELECT SUM(premio) FROM maillot', hints:['SUM(premio).']},
+{id:'w-c-grp4', db:'ciclismo', kind:'select', src:'Boletín 1 Ciclismo · ej. 14', title:'Altura media por categoría', prompt:'Obtén la altura media de los puertos de cada categoría.', ref:'SELECT categoria, AVG(altura) FROM puerto GROUP BY categoria', hints:['GROUP BY categoria.']},
+{id:'w-i-14', db:'instituto', kind:'select', src:'Boletín extra · ej. 1', title:'Todos los alumnos', prompt:'Obtén todos los datos de todos los alumnos.', ref:'SELECT * FROM alumno', hints:['SELECT * FROM tabla.']},
+{id:'w-i-15', db:'instituto', kind:'select', src:'Boletín extra · ej. 2', title:'Solo los nombres', prompt:'Obtén el listado de todos los nombres de los alumnos.', ref:'SELECT nombre FROM alumno', hints:['Una sola columna.']},
+{id:'w-i-16', db:'instituto', kind:'select', src:'Boletín extra · ej. 4', title:'El alumno con id 5', prompt:'Obtén todos los datos del alumno con id igual a 5.', ref:'SELECT * FROM alumno WHERE id = 5', hints:['WHERE id = 5.']},
+{id:'w-i-17', db:'instituto', kind:'select', src:'Boletín extra · ej. 7', title:'Por fecha de nacimiento descendente', prompt:'Obtén todos los alumnos ordenados por fecha_nacimiento de forma descendente.', ref:'SELECT * FROM alumno ORDER BY fecha_nacimiento DESC', hints:['ORDER BY ... DESC.']},
+{id:'w-i-18', db:'instituto', kind:'select', src:'Boletín extra · ej. 14', title:'Email generado', prompt:'Obtén los alumnos con una columna adicional que muestre un email con el formato nombre.apellido1@instituto.es (todo en minúsculas).', ref:"SELECT *, CONCAT(LOWER(nombre), '.', LOWER(apellido1), '@instituto.es') FROM alumno", hints:['CONCAT(LOWER(nombre), \'.\', LOWER(apellido1), \'@instituto.es\').']},
+{id:'w-i-19', db:'instituto', kind:'select', src:'Boletín extra · ej. 16', title:'Día de la semana y mes', prompt:'Obtén el nombre completo, el día de la semana y el mes de la fecha de nacimiento de cada alumno.', ref:"SELECT CONCAT_WS(' ', nombre, apellido1, apellido2), DAYNAME(fecha_nacimiento), MONTHNAME(fecha_nacimiento) FROM alumno", hints:['DAYNAME() y MONTHNAME().']}
+);
+})();
 </script>
 <script>// BDA-QUEST · motor del juego (mismo método que SYS-QUEST: teoría con truco, rondas de 10,
 // banco de fallos que se repite hasta acertar 2 veces seguidas, chuleta y progreso).
@@ -2356,7 +2572,7 @@ const pick = a => a[Math.floor(Math.random()*a.length)];
 const UNITS = D.UNITS, unitById = id => UNITS.find(u => u.id === id);
 const caseById = id => D.CASES.find(c => c.id === id);
 const KEY = 'bdaquest_v1';
-const fresh = () => ({plan:{}, xp:0, streak:0, best:0, done:0, right:0, fails:{}, recent:[], unit:{}, exams:[]});
+const fresh = () => ({paper:{}, plan:{}, xp:0, streak:0, best:0, done:0, right:0, fails:{}, recent:[], unit:{}, exams:[]});
 let save;
 try { save = {...fresh(), ...JSON.parse(localStorage.getItem(KEY) || '{}')}; } catch { save = fresh(); }
 function persist(){ try { localStorage.setItem(KEY, JSON.stringify(save)); } catch(e){} hud(); }
@@ -2647,6 +2863,203 @@ Object.assign(T2, {renderEnts, checkEnts, renderAttrs, checkAttrs, renderCard, c
 T2.render = q => ({ents: renderEnts, attrs: renderAttrs, card: renderCard, assert: renderAssert, ddlw: renderDdlw, dmlr: renderDmlr, dmlw: renderDmlw})[q.type](q);
 T2.check = q => ({ents: checkEnts, attrs: checkAttrs, card: checkCard, assert: checkAssert, ddlw: checkDdlw, dmlr: checkDmlr, dmlw: checkDmlw})[q.type](q);
 
+// BDA-QUEST · MODO PAPEL. Se inserta dentro de app.js (marcador PAPER).
+// Flujo: lees el enunciado → lo haces en el folio → 💡 Pista (de una en una) → ✅ Corregir (solución + casillas para puntuarte).
+const ALLC = () => [...D.CASES, ...D.PCASES];
+const caseAny = id => ALLC().find(c => c.id === id);
+const fp = p => `(${p[0]},${p[1]})`;
+const strip = h => String(h).replace(/<[^>]+>/g, '');
+function relText(r) {
+  if (r.ternary) return `${r.ternary.map(x => `${esc(x.e)} <b>${fp(x.m)}</b>`).join(' — ')} · <b>${esc(r.verb)}</b> (ternaria)${r.attr ? ' · atributo: ' + esc(r.attr) : ''}`;
+  if (r.roles) return `${esc(r.a)} <i>[rol ${esc(r.roles.a)}]</i> <b>${fp(r.na)}</b> — ${esc(r.verb)} — <b>${fp(r.nb)}</b> <i>[rol ${esc(r.roles.b)}]</i> ${esc(r.b)} (reflexiva, ${r.tipo})${r.attr ? ' · atributo: ' + esc(r.attr) : ''}`;
+  return `${esc(r.a)} <b>${fp(r.na)}</b> — ${esc(r.verb)} — <b>${fp(r.nb)}</b> ${esc(r.b)} · ${r.tipo}${r.attr ? ' · atributo: ' + esc(r.attr) : ''}`;
+}
+function attrText(a) {
+  const f = a[1] || '', n = esc(a[0]);
+  if (f.includes('I')) return `<u>${n}</u>`;
+  if (f.includes('p')) return `<u style="text-decoration-style:dashed">${n}</u> <i>(clave parcial)</i>`;
+  let s = n; if (f.includes('a')) s += ' <i>(única)</i>'; if (f.includes('o')) s += ' <i>(opcional)</i>'; if (f.includes('m')) s += ' <i>(multivalorado)</i>'; if (f.includes('c')) s += ' <i>(componente de compuesto)</i>';
+  return s;
+}
+const entText = e => `<b>${esc(e.n)}</b>(${e.attrs.map(attrText).join(', ')})`;
+function marcoText(t, tables) {
+  const pk = x => x.cols.filter(c => /P/.test(c[1])).map(c => c[0]);
+  const L = [`${t.name} = ${t.cols.map(c => c[0]).join(' + ')}`, `CP(${pk(t).join(', ')})`];
+  t.cols.filter(c => /A/.test(c[1])).forEach(c => L.push(`C.Alt(${c[0]})`));
+  const groups = new Map();
+  t.cols.filter(c => c[2]).forEach(c => { const k = c[2] + '#' + (c[4] || c[0]); if (!groups.has(k)) groups.set(k, {to: c[2], cols: []}); groups.get(k).cols.push(c[0]); });
+  groups.forEach(g => { const R = tables.find(x => x.name === g.to); L.push(`C.Aj(${g.cols.join(', ')}) → ${g.to}(${R ? pk(R).join(', ') : 'id'})`); });
+  const v = t.cols.filter(c => /V/.test(c[1]) && !/P/.test(c[1])).map(c => `VNN(${c[0]})`); if (v.length) L.push(v.join('  '));
+  return L.join('\n');
+}
+function subsetDet(c) {
+  const T = c.tables, t0 = T.find(t => t.cols.some(x => x[2] && x[2] !== t.name)) || T[0]; const names = [t0.name];
+  t0.cols.forEach(x => { if (x[2] && x[2] !== t0.name && !names.includes(x[2]) && names.length < 4) names.push(x[2]); });
+  return names.map(n => T.find(t => t.name === n));
+}
+
+// ---------- construcción de cada ejercicio ----------
+function paperItem(id) {
+  const [k, rest] = [id.split(':')[0], id.split(':').slice(1).join(':')];
+  if (k === 'er') return itemER(caseAny(rest));
+  if (k === 'tab') return itemTab(caseAny(rest));
+  if (k === 'ddlv') return itemDdlV(caseAny(rest));
+  if (k === 'ddlw') return itemDdlW(caseAny(rest));
+  if (k === 'dmlr') return itemDmlR(D.DMLR.find(t => t.id === rest));
+  if (k === 'dmlw') return itemDmlW(D.DMLW.find(t => t.id === rest));
+  if (k === 'norm') return itemNorm(D.NORM.find(t => t.id === rest));
+  if (k === 'card0') return itemCard0();
+}
+const rulesList = c => `<ol class="prules">${c.rules.map(r => `<li>${r}</li>`).join('')}</ol>`;
+function itemER(c) {
+  const er = T2.erOf(c), hints = [
+    `Subraya en el enunciado los <b>sustantivos con identificador</b>: serán entidades. Hay <b>${er.entities.length}</b>. Todas en <b>singular</b>.`,
+    `Las entidades empiezan por: ${er.entities.map(e => esc(e.n[0]) + '…').join(', ')}.`,
+    `Busca los <b>verbos</b>: hay <b>${c.rels.length}</b> relaciones${c.rels.some(r => r.roles) ? ' (alguna es <b>reflexiva</b>: pon un rol en cada punta)' : ''}${c.rels.some(r => r.ternary) ? ' (una es <b>ternaria</b>: tres pares)' : ''}.`,
+    'Cada par: «puede / ninguno» → 0 · «siempre / exactamente / al menos uno / todo» → 1 · «varios / muchos» → N. Pon el par <b>pegado a la entidad que se cuenta</b> y escribe la frase al lado.',
+    `Atributos: subraya el identificador${er.entities.some(e => e.attrs.some(a => /o/.test(a[1]))) ? ', marca los <b>opcionales</b>' : ''}${er.entities.some(e => e.attrs.some(a => /m/.test(a[1]))) ? ', dobla el óvalo de los <b>multivalorados</b>' : ''}. Lo que no se dice que es opcional es obligatorio.`];
+  const rub = [`Entidades en <b>singular</b>: ${er.entities.map(e => esc(e.n)).join(', ')}`,
+    ...er.entities.map(e => `Identificador de <b>${esc(e.n)}</b>: ${esc(e.attrs.filter(a => /I|p/.test(a[1])).map(a => a[0]).join(' + '))}${e.attrs.some(a => /o/.test(a[1])) ? ' · opcionales: ' + esc(e.attrs.filter(a => /o/.test(a[1])).map(a => a[0]).join(', ')) : ''}${e.attrs.some(a => /m/.test(a[1])) ? ' · multivalorados: ' + esc(e.attrs.filter(a => /m/.test(a[1])).map(a => a[0]).join(', ')) : ''}`),
+    ...c.rels.map(relText), ...(c.decisions || []).map(d => `${esc(d.title)}: ${esc(d.opts.find(o => o[1])[0])}`), ...(c.extra || []).map(strip).map(esc)];
+  const sol = `<h4>Entidades y atributos</h4><ul class="plist">${er.entities.map(e => `<li>${entText(e)}</li>`).join('')}</ul><h4>Relaciones (par pegado a la entidad que se cuenta)</h4><ul class="plist">${c.rels.map(r => `<li>${relText(r)}<br><span class="small">${esc(r.why || '')}</span></li>`).join('')}</ul>${(c.decisions || []).length ? `<h4>Decisiones de modelado</h4><ul class="plist">${c.decisions.map(d => `<li><b>${esc(d.title)}:</b> ${esc(d.opts.find(o => o[1])[0])}<br><span class="small">${esc(d.opts.find(o => o[1])[2])}</span></li>`).join('')}</ul>` : ''}${(c.extra || []).length ? `<h4>Detalles</h4><ul class="plist">${c.extra.map(x => `<li>${x}</li>`).join('')}</ul>` : ''}${(er.traps || []).length ? `<p class="small">No son entidades: ${er.traps.map(t => esc(t.n)).join(', ')}.</p>` : ''}<h4>Dibujo</h4>${c.img ? `<img src="${c.img}" alt="E/R" style="max-width:100%;background:#fff">` : T2.erSvg(c)}<p class="small">Dibujo simplificado (sin atributos ni ISA/débiles): compara entidades y pares.</p>`;
+  return {id: 'er:' + c.id, part: 1, title: `E/R · ${c.name}`, src: c.from, statement: `${rulesList(c)}<p><b>Dibuja el E/R:</b> entidades (singular), atributos (identificador subrayado, opcionales, multivalorados), relaciones con su <b>(min,max)</b>, roles en las reflexivas y atributos de las relaciones.</p>`, hints, solution: sol, rubric: rub};
+}
+function itemTab(c) {
+  const er = T2.erOf(c), tables = c.tables;
+  const fig = c.img ? `<img src="${c.img}" alt="E/R" style="max-width:100%;background:#fff">` : T2.erSvg(c);
+  const hasRefl = c.rels.some(r => r.roles), hasTern = c.rels.some(r => r.ternary);
+  const hints = [
+    `Pasan a tabla las <b>entidades</b> (${er.entities.length}) más una tabla por cada <b>N:M</b>${hasTern ? ' y por la <b>ternaria</b>' : ''}${er.entities.some(e => e.attrs.some(a => /m/.test(a[1]))) ? ' y por cada atributo <b>multivalorado</b>' : ''}. Total: <b>${tables.length}</b> tablas. Nombres en <b>singular y mayúsculas</b>.`,
+    'En cada <b>1:N</b> la FK va en la tabla del lado N. En cada <b>N:M</b>, tabla intermedia con las dos FKs y CP compuesta (los atributos de la relación van ahí).',
+    `Nulabilidad de cada FK: mínimo <b>1</b> → VNN (NOT NULL); mínimo <b>0</b> → admite NULL.${hasRefl ? ' La reflexiva es una FK a la misma tabla.' : ''}${hasTern ? ' En la ternaria, CP = las tres FKs.' : ''}`,
+    `<b>Existencialidad:</b> mira los pares con mínimo 1 en la entidad del lado "1" (todo X tiene al menos un Y): no sale de la FK, se escribe una ASERCIÓN <code>X[clave] ⊆ Y[fk]</code>.${(c.asserts || []).length ? ' Aquí hay ' + c.asserts.length + '.' : ' Aquí quizá no haga falta ninguna.'}`,
+    'Para cada tabla repasa las 5 preguntas: CP · C.Alt (únicos) · C.Aj (a quién apunta) · VNN (obligatorios) · ¿CP compuesta?'];
+  const rub = [...tables.map(t => `<b>${esc(t.name)}</b>: ${esc(marcoText(t, tables).replace(/\n/g, ' · '))}`), ...(c.asserts || []).map(a => `ASERCIÓN: <code>${esc(a.t)}</code>`), ...((c.asserts || []).length ? [] : ['No invento aserciones: ningún mínimo 1 en el lado "1"']), 'Tablas en singular y en mayúsculas'];
+  const sol = `<pre class="code">${esc(tables.map(t => marcoText(t, tables)).join('\n\n'))}${(c.asserts || []).length ? '\n\n' + esc(c.asserts.map((a, i) => `ASERCIÓN ${i + 1}: ${a.t}`).join('\n')) : ''}</pre>${tables.filter(t => t.note).map(t => `<p class="small"><b>${esc(t.name)}:</b> ${esc(t.note)}</p>`).join('')}${(c.asserts || []).map(a => `<p class="small">${esc(a.why)}</p>`).join('')}`;
+  return {id: 'tab:' + c.id, part: 2, title: `Paso a tablas · ${c.name}`, src: c.from, statement: `${fig}<h4>Atributos</h4><ul class="plist">${er.entities.map(e => `<li>${entText(e)}</li>`).join('')}</ul><h4>Relaciones (par pegado a la entidad que se cuenta)</h4><ul class="plist">${c.rels.map(r => `<li>${relText(r)}</li>`).join('')}</ul>${(c.extra || []).length ? `<ul class="plist small">${c.extra.map(x => `<li>${x}</li>`).join('')}</ul>` : ''}<p><b>Haz el paso a tablas</b> con la notación de marco: CP, C.Alt, C.Aj, VNN y las <b>restricciones de existencialidad</b> (aserciones) que exija el diagrama.</p>`, hints, solution: sol, rubric: rub};
+}
+function itemDdlV(c) {
+  const lines = parseDDL(c.ddl), ids = Object.keys(c.errors);
+  const num = lines.map((l, i) => `${String(i + 1).padStart(2)}  ${l.text}`).join('\n');
+  const prim = e => lines.findIndex(l => l.errs.includes(e)) + 1;
+  const hints = [`Hay <b>${ids.length} errores</b> respecto al enunciado.`, 'Recorre tabla a tabla: ¿PK? ¿FKs (y a qué tabla/columna)? ¿NOT NULL donde toca y solo donde toca? ¿UNIQUE? ¿orden de creación? ¿nombres en singular?', `Errores en las líneas: ${ids.map(prim).sort((a, b) => a - b).join(', ')}.`, 'En el porqué, cita la regla del enunciado (R1, R2...) y di cómo quedaría bien.'];
+  return {id: 'ddlv:' + c.id, part: 3, title: `DDL: validar · ${c.name}`, src: c.from, statement: `${rulesList(c)}<p><b>Marca las líneas con error y explica por qué</b> (campo libre). Si falta algo, indica dónde debería ir.</p><pre class="code">${esc(num)}</pre>`, hints,
+    solution: `<ol class="plist">${ids.map(e => `<li><b>Línea ${prim(e)}:</b> ${c.errors[e].model}</li>`).join('')}</ol>`, rubric: ids.map(e => `Línea ${prim(e)} encontrada y explicada: ${esc(strip(c.errors[e].model).slice(0, 110))}…`)};
+}
+function itemDdlW(c) {
+  const sub = subsetDet(c), spec = specOf(c, sub);
+  const rub = []; spec.forEach(t => { const pk = t.cols.filter(x => /P/.test(x[1])).map(x => x[0]); rub.push(`<b>${esc(t.name)}</b>: PRIMARY KEY (${esc(pk.join(', '))})`);
+    t.cols.filter(x => x[2]).forEach(x => rub.push(`FK ${esc(t.name)}.${esc(x[0])} → ${esc(x[2])}`));
+    const nn = t.cols.filter(x => /V/.test(x[1]) && !/P/.test(x[1])).map(x => x[0]); if (nn.length) rub.push(`NOT NULL en ${esc(t.name)}: ${esc(nn.join(', '))}`);
+    t.cols.filter(x => /A/.test(x[1])).forEach(x => rub.push(`UNIQUE en ${esc(t.name)}.${esc(x[0])}`)); });
+  rub.push('Tablas en singular y creadas en el orden correcto'); rub.push('Sin consultas (solo CREATE TABLE)');
+  const hints = ['Orden de creación: primero las tablas a las que apuntan otras.', 'Para cada tabla: columnas con tipo → NOT NULL en lo obligatorio → PRIMARY KEY (compuesta una sola vez) → UNIQUE en alternativas → FOREIGN KEY ... REFERENCES.', `Tablas: ${sub.map(t => t.name).join(', ')}. FK obligatoria → NOT NULL; opcional → sin NOT NULL.`, 'Los tipos no son lo importante: INT, VARCHAR(n), DATE, DECIMAL(8,2).'];
+  return {id: 'ddlw:' + c.id, part: 3, title: `DDL: desde cero · ${c.name}`, src: c.from, statement: `${rulesList(c)}<p><b>Escribe el DDL</b> (solo <code>CREATE TABLE</code>, sin consultas) de estas ${sub.length} tablas. Tablas en singular y en el orden correcto.</p><pre class="code">${esc(sub.map(t => marcoLine(t, false)).join('\n'))}</pre><p class="small">Las claves y los nulos los deduces del enunciado.</p>`, hints,
+    solution: `<pre class="code">${esc(BQ_SOLUTION(c, sub))}</pre><p class="small">Los tipos pueden variar: lo que se evalúa son claves, nulos, UNIQUE y FK.</p>`, rubric: rub};
+}
+function dmlResult(db, sql) {
+  const r = runSafe(db, sql); if (r.error) return `<div class="dres bad">❌ ${esc(r.error)}</div>`;
+  return r.kind === 'select' ? resultTable(r, 8) : `<p>${esc(r.op)}: <b>${r.affected}</b> fila(s) afectada(s).</p>`;
+}
+function itemDmlR(t) {
+  const hints = ['Simula la sentencia con los datos: ¿qué devuelve o qué cambia exactamente?', 'Repasa la lista: WHERE · comillas · comas · orden de las cláusulas · NULL · paréntesis con AND/OR · ASC/DESC.', `Piensa en: «${esc(t.why[0][0])}».`, 'Escribe la corrección en el folio aunque no estés seguro del porqué.'];
+  const ref = [].concat(t.ref)[0];
+  return {id: 'dmlr:' + t.id, part: 4, title: `DML: revisar · ${t.title}`, src: 'Sentencia con error', statement: `<p>${esc(t.prompt)}</p>${dataViewer(t.db)}<pre class="code">${esc(t.bad)}</pre><p><b>¿Qué está mal y por qué?</b> Escribe la explicación y la sentencia corregida.</p>`, hints,
+    solution: `<p>${t.model}</p><p><b>Corrección:</b></p><pre class="code">${esc(ref)}</pre><div class="cols2"><div class="dres"><b>Lo que hace la sentencia con error</b>${dmlResult(t.db, t.bad)}</div><div class="dres"><b>Lo que debería hacer</b>${dmlResult(t.db, ref)}</div></div>`,
+    rubric: [`Vi el error: ${esc(strip(t.model).slice(0, 120))}…`, 'Lo expliqué con la idea clave (campo libre)', 'Escribí la sentencia corregida y da el mismo resultado']};
+}
+function itemDmlW(t) {
+  const refs = [].concat(t.ref), hints = [...(t.hints || [])]; if (t.skeleton) hints.push(`Plantilla:<pre class="code">${esc(t.skeleton)}</pre>`);
+  if (!hints.length) hints.push('Construye la sentencia cláusula a cláusula: SELECT → FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT.');
+  return {id: 'dmlw:' + t.id, part: 4, title: `DML: desde cero · ${t.title}`, src: t.src, statement: `<p>${esc(t.prompt)}</p>${t.aliases ? `<p class="small">La columna debe llamarse <code>${esc(t.aliases.join(', '))}</code>.</p>` : ''}${dataViewer(t.db)}<p><b>Escribe la sentencia</b> en el folio.</p>`, hints,
+    solution: `${refs.map((r, i) => `<p>${refs.length > 1 ? 'Opción ' + (i + 1) + ':' : '<b>Solución:</b>'}</p><pre class="code">${esc(r.replace(/;\s*/g, ';\n'))}</pre>`).join('')}<div class="dres"><b>Resultado esperado</b>${dmlResult(t.db, refs[0])}</div>`,
+    rubric: ['Mi sentencia daría el mismo resultado (o equivalente)', 'Orden de cláusulas correcto y comillas/comas bien', ...(t.aliases ? ['Alias pedido: ' + esc(t.aliases.join(', '))] : [])]};
+}
+function itemNorm(t) { return {id: 'norm:' + t.id, part: 5, title: `Normalización · ${t.title}`, src: 'Boletín normalización', statement: `<p>${t.q}</p><p class="small">Notación DeMarco: <code>{ }</code> repetición · <code>[ ]</code> opcional · <code>( )</code> composición.</p>`, hints: t.hints, solution: t.sol, rubric: t.rub}; }
+function itemCard0() { return {id: 'card0', part: 1, title: 'Cardinalidades (boletín 0)', src: 'Boletín 0: Cardinalidades', statement: `<p>Representa las cardinalidades (par pegado a la entidad que se cuenta):</p><ol class="plist">${D.CARD0.map(x => `<li>${esc(x[0])}</li>`).join('')}</ol>`, hints: ['Pregúntate en cada frase: ¿puede existir uno SIN el otro? (mínimo) y ¿cuántos a la vez? (máximo).', 'Si la parte no existe sin el todo (vagón, ejemplar, municipio) → entidad débil.', '«Varios y varios» → N:M; si hay datos de la pareja (nota, cantidad) van en la relación.'], solution: `<ol class="plist">${D.CARD0.map(x => `<li>${x[1]}</li>`).join('')}</ol>`, rubric: D.CARD0.map((x, i) => `${i + 1}. ${esc(x[0].slice(0, 60))}`)}; }
+
+// ---------- listas por sección ----------
+function paperSections() {
+  const caseIds = D.CASES.filter(c => c.id !== 'huertoex').map(c => c.id), pcs = D.PCASES.map(c => c.id);
+  return [
+    {k: 'er', t: '1 · E/R (conceptual)', ids: [...caseIds, ...pcs, 'card0'].map(i => i === 'card0' ? 'card0' : 'er:' + i)},
+    {k: 'tab', t: '2 · Paso a tablas + existencialidad', ids: [...D.CASES.map(c => c.id), ...pcs].map(i => 'tab:' + i)},
+    {k: 'ddlv', t: '3 · DDL: validar y explicar el porqué', ids: D.CASES.map(c => 'ddlv:' + c.id)},
+    {k: 'ddlw', t: '3 · DDL: escribir desde cero', ids: D.CASES.map(c => 'ddlw:' + c.id)},
+    {k: 'dmlr', t: '3 · DML: revisar errores', ids: D.DMLR.map(t => 'dmlr:' + t.id)},
+    {k: 'dmlw', t: '3 · DML: desde cero (boletines)', ids: D.DMLW.map(t => 'dmlw:' + t.id)},
+    {k: 'norm', t: 'Normalización (boletín)', ids: D.NORM.map(t => 'norm:' + t.id)}];
+}
+const paperTitle = id => { const it = paperItem(id); return it ? it.title.replace(/^[^·]+· /, '') : id; };
+
+// ---------- pantallas ----------
+let pp = null;
+function paperHome() {
+  const secs = paperSections(), pc = save.paper || {};
+  const dn = ids => ids.filter(i => pc[i] !== undefined).length;
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.home()">← Plan</button></div><section class="hero"><h1>✏️ Modo papel</h1>
+   <p>El examen es en papel: aquí <b>lees</b>, lo haces <b>en el folio</b>, y cuando acabes pulsas <b>✅ Corregir</b> para ver la solución y marcar lo que tenías bien. Si te atascas: <b>💡 Pista</b> (de una en una).</p>
+   <div class="row big"><button class="primary" onclick="BQA.paperExam()">📝 Simulacro en papel (examen completo)</button></div>
+   <div class="row"><button class="ghost" onclick="BQA.paperPrint('')">🖨 Imprimir un examen (enunciados)</button><button class="ghost" onclick="BQA.paperPrint('sol')">🖨 …con soluciones</button></div></section>
+   ${secs.map(s => `<button class="ucard" style="width:100%" onclick="BQA.paperList('${s.k}')"><span class="uicon">✏</span><span class="uname">${esc(s.t)}</span><span class="usub">${s.ids.length} ejercicios</span><span class="ubadge">PAPEL</span><span class="upct">${dn(s.ids)}/${s.ids.length}</span></button>`).join('<div style="height:8px"></div>')}`);
+}
+function paperList(k) {
+  const s = paperSections().find(x => x.k === k), pc = save.paper || {};
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.paper()">← Modo papel</button></div><section class="hero"><h1>${esc(s.t)}</h1><div class="row"><button class="primary" onclick="BQA.paperOpen('${s.k}',0)">▶ Empezar por el primero</button></div></section>
+   <div class="cases">${s.ids.map((id, i) => { const p = pc[id]; return `<div class="case"><b>${esc(paperTitle(id))}</b> ${p !== undefined ? `<span class="tag">${p}%</span>` : ''}<div class="row"><button onclick="BQA.paperOpen('${s.k}',${i})">Abrir</button></div></div>`; }).join('')}</div>`);
+}
+function paperOpen(k, i, ids, title) {
+  const s = k ? paperSections().find(x => x.k === k) : null;
+  pp = {list: ids || s.ids, i, sec: k, title: title || (s ? s.t : ''), hint: 0, done: false, checks: new Set()}; paperShow();
+}
+function paperShow() {
+  const id = pp.list[pp.i], it = paperItem(id); pp.it = it; pp.hint = 0; pp.done = false; pp.checks = new Set();
+  view(`<div class="crumb"><button class="ghost" onclick="${pp.sec ? `BQA.paperList('${pp.sec}')` : 'BQA.paper()'}">✕ Salir</button><span class="small">${esc(pp.title)} · ${pp.i + 1}/${pp.list.length}</span></div>
+   <section class="qcard"><div class="qhead"><span class="tag">✏ ${it.part === 5 ? 'NORMALIZACIÓN' : 'PARTE ' + it.part}</span>${it.src ? `<span class="tag ghosttag">${esc(it.src)}</span>` : ''}</div>
+   <h2>${it.title}</h2><div class="statement">${it.statement}</div>
+   <p class="small">✏ Hazlo en el folio. 💡 Si te atascas, pide una pista. Cuando acabes, ✅ Corregir.</p>
+   <div class="row big"><button class="ghost" id="pHint" onclick="BQA.paperHint()">💡 Pista (0/${it.hints.length})</button><button class="primary" id="pCorr" onclick="BQA.paperCorrect()">✅ Corregir</button></div>
+   <div id="pHints"></div><div id="pSol"></div></section>`);
+}
+function paperHint() {
+  const it = pp.it; if (pp.hint < it.hints.length) pp.hint++;
+  $('pHints').innerHTML = it.hints.slice(0, pp.hint).map((h, i) => `<div class="hint">💡 ${i + 1}. ${h}</div>`).join('');
+  $('pHint').textContent = `💡 Pista (${pp.hint}/${it.hints.length})`; if (pp.hint >= it.hints.length) $('pHint').disabled = true;
+}
+function paperCorrect() {
+  if (pp.done) return; pp.done = true; const it = pp.it; $('pHint').disabled = true; $('pCorr').disabled = true;
+  $('pSol').innerHTML = `<div class="feedback ok"><h3>✅ Solución</h3>${it.solution}</div>
+   <div class="feedback ko"><h3>Corrígete: marca lo que tenías bien</h3><div class="rub">${it.rubric.map((r, i) => `<label><input type="checkbox" onchange="BQA.paperTick(${i},this.checked)"> <span>${r}</span></label>`).join('')}</div><p id="pScore" class="small">0 de ${it.rubric.length}</p>
+   <div class="row"><button class="primary" onclick="BQA.paperNext()">${pp.i + 1 < pp.list.length ? 'Siguiente →' : 'Terminar'}</button><button class="ghost" onclick="BQA.paperAll()">Lo tenía todo ✔</button></div></div>`;
+  $('pSol').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+function paperScore() { const n = pp.it.rubric.length, c = pp.checks.size; if ($('pScore')) $('pScore').textContent = `${c} de ${n} (${Math.round(c / n * 100)}%)`; }
+function paperTick(i, on) { on ? pp.checks.add(i) : pp.checks.delete(i); paperScore(); }
+function paperAll() { document.querySelectorAll('.rub input').forEach((b, i) => { b.checked = true; pp.checks.add(i); }); paperScore(); }
+function paperNext() {
+  const it = pp.it, pct = Math.round(pp.checks.size / it.rubric.length * 100);
+  save.paper = save.paper || {}; save.paper[it.id] = pct; pp.scores = pp.scores || {}; pp.scores[it.id] = pct;
+  const gain = Math.round(pct / 5); save.xp += gain; persist();
+  if (pp.i + 1 < pp.list.length) { pp.i++; paperShow(); return; }
+  const sc = Object.values(pp.scores), avg = Math.round(sc.reduce((a, b) => a + b, 0) / sc.length);
+  const byPart = {}; pp.list.forEach(id => { const p = paperItem(id).part; (byPart[p] = byPart[p] || []).push(pp.scores[id] ?? 0); });
+  view(`<section class="hero"><h1>${avg >= 80 ? '🏆' : avg >= 50 ? '👍' : '📚'} ${esc(pp.title)}</h1><p>Autocorrección media: <b>${avg}%</b></p>
+   <div class="parts">${Object.keys(byPart).map(p => { const v = Math.round(byPart[p].reduce((a, b) => a + b, 0) / byPart[p].length); return `<div class="part"><b>${p == 5 ? 'Norm.' : 'Parte ' + p}</b><strong>${v}%</strong><i style="width:${v}%"></i></div>`; }).join('')}</div>
+   <p class="small">Tu nota de cada ejercicio queda guardada en el listado.</p><div class="row big"><button class="primary" onclick="BQA.paper()">Modo papel</button><button onclick="BQA.home()">Plan</button></div></section>`);
+}
+function paperExam(caseId) {
+  const pool = D.CASES.filter(c => c.id !== 'huertoex'), c = caseId ? caseAny(caseId) : pick(pool);
+  const ids = [`er:${c.id}`, `tab:${c.id}`, `ddlv:${c.id}`, `ddlw:${c.id}`, ...shuffle(D.DMLR).slice(0, 5).map(t => 'dmlr:' + t.id), 'dmlw:' + pick(D.DMLW).id];
+  paperOpen(null, 0, ids, `Simulacro en papel · ${c.name}`);
+}
+function paperPrint(mode) {
+  const pool = D.CASES.filter(c => c.id !== 'huertoex'), c = pick(pool);
+  const ids = [`er:${c.id}`, `tab:${c.id}`, `ddlv:${c.id}`, `ddlw:${c.id}`, ...shuffle(D.DMLR).slice(0, 5).map(t => 'dmlr:' + t.id), 'dmlw:' + pick(D.DMLW).id];
+  const its = ids.map(paperItem);
+  view(`<div class="crumb"><button class="ghost" onclick="BQA.paper()">← Modo papel</button><button class="primary" onclick="window.print()">🖨 Imprimir / guardar PDF</button><button class="ghost" onclick="BQA.paperPrint('${mode}')">Otro examen</button></div>
+   <section class="block printsheet"><h3>Examen de práctica · ${esc(c.name)}</h3><p class="small">Parte 1: E/R · Parte 2: paso a tablas · Parte 3: DDL y DML. Convención de clase: (min,max) pegado a la entidad que se cuenta.</p>${its.map((it, n) => `<div class="pitem"><h4>${n + 1}. ${it.title}</h4><div class="statement">${it.statement}</div>${mode === 'sol' ? `<div class="psol"><b>Solución</b>${it.solution}</div>` : '<div class="lines"></div>'}</div>`).join('')}</section>`);
+}
+
 
 // ---------- HUD ----------
 const level = () => 1 + Math.floor(save.xp/150);
@@ -2687,7 +3100,7 @@ function home(){
    <div class="bar" style="width:100%;margin:6px 0"><i style="width:${pct}%"></i></div><p class="small">${done} de ${PLAN.length} pasos hechos</p>
    ${cur ? `<div class="stepnow"><span class="uicon">${cur.i}</span><div><b>Paso ${n+1}: ${esc(cur.t)}</b><br><span class="small">≈ ${cur.m} min · una cosa cada vez</span></div></div>
    <div class="row big"><button class="primary" onclick="BQA.planGo(${n})">▶ Empezar este paso</button><button class="ghost" onclick="BQA.planSkip(${n})">Saltar</button></div>` : `<h2>🏆 ¡Plan completado!</h2><div class="row big"><button class="primary" onclick="BQA.exam()">📝 Otro simulacro</button><button onclick="BQA.review()">♻ Repasar fallos</button></div>`}
-   <div class="row"><button class="ghost" id="tmBtn" onclick="BQA.pomo()">⏱ 25</button><span class="small">Temporizador de 25 min: cuando suene, 5 min de descanso.</span></div></section>
+   <div class="row"><button class="primary" onclick="BQA.paper()">✏️ Modo papel (resuelvo en folio)</button></div><div class="row"><button class="ghost" id="tmBtn" onclick="BQA.pomo()">⏱ 25</button><span class="small">Temporizador de 25 min: cuando suene, 5 min de descanso.</span></div></section>
    <ol class="plan">${PLAN.map((p,k)=>`<li class="${save.plan[k]?'dn':k===n?'now':''}"><button onclick="BQA.planGo(${k})"><span>${save.plan[k]?'✔':p.i}</span> ${esc(p.t)} <small>${p.m} min</small></button></li>`).join('')}</ol>
    <details class="rules"><summary>Más opciones (todos los casos, temas, rondas)</summary><div id="moreBox"></div></details>`);
   $('moreBox').innerHTML = homeFull(); pomoTick(); hud();
@@ -2977,6 +3390,7 @@ function reset(){ if(confirm('¿Borrar todo el progreso y los fallos guardados?'
 
 // ---------- API para los botones ----------
 window.BQA = {
+  paper:paperHome, paperList, paperOpen, paperHint, paperCorrect, paperTick, paperAll, paperNext, paperExam, paperPrint,
   home, planGo, pomo:pomoToggle, planSkip(i){ save.plan[i]=true; persist(); home(); }, unit:unitView, campaign, review, exam, casePart, cheats, progress, reset, check, selfOk,
   quit(){ if(!run || confirm('¿Salir? Lo contestado ya cuenta para el progreso.')) home(); },
   opt(i){ if(st.answered) return; if(st.q.type==='multi'){ st.sel.has(i)?st.sel.delete(i):st.sel.add(i); } else { st.sel = new Set([i]); }

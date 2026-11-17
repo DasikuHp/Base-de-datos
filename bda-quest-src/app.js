@@ -10,7 +10,7 @@ const pick = a => a[Math.floor(Math.random()*a.length)];
 const UNITS = D.UNITS, unitById = id => UNITS.find(u => u.id === id);
 const caseById = id => D.CASES.find(c => c.id === id);
 const KEY = 'bdaquest_v1';
-const fresh = () => ({plan:{}, xp:0, streak:0, best:0, done:0, right:0, fails:{}, recent:[], unit:{}, exams:[]});
+const fresh = () => ({paper:{}, plan:{}, xp:0, streak:0, best:0, done:0, right:0, fails:{}, recent:[], unit:{}, exams:[]});
 let save;
 try { save = {...fresh(), ...JSON.parse(localStorage.getItem(KEY) || '{}')}; } catch { save = fresh(); }
 function persist(){ try { localStorage.setItem(KEY, JSON.stringify(save)); } catch(e){} hud(); }
@@ -24,6 +24,7 @@ function hasAlt(text, alt){
 }
 function groupsHit(text, groups){ const t = ' '+norm(text)+' '; return groups.map(g => g.some(alt => hasAlt(t, alt))); }
 /*TASKS2*/
+/*PAPER*/
 
 // ---------- HUD ----------
 const level = () => 1 + Math.floor(save.xp/150);
@@ -64,7 +65,7 @@ function home(){
    <div class="bar" style="width:100%;margin:6px 0"><i style="width:${pct}%"></i></div><p class="small">${done} de ${PLAN.length} pasos hechos</p>
    ${cur ? `<div class="stepnow"><span class="uicon">${cur.i}</span><div><b>Paso ${n+1}: ${esc(cur.t)}</b><br><span class="small">≈ ${cur.m} min · una cosa cada vez</span></div></div>
    <div class="row big"><button class="primary" onclick="BQA.planGo(${n})">▶ Empezar este paso</button><button class="ghost" onclick="BQA.planSkip(${n})">Saltar</button></div>` : `<h2>🏆 ¡Plan completado!</h2><div class="row big"><button class="primary" onclick="BQA.exam()">📝 Otro simulacro</button><button onclick="BQA.review()">♻ Repasar fallos</button></div>`}
-   <div class="row"><button class="ghost" id="tmBtn" onclick="BQA.pomo()">⏱ 25</button><span class="small">Temporizador de 25 min: cuando suene, 5 min de descanso.</span></div></section>
+   <div class="row"><button class="primary" onclick="BQA.paper()">✏️ Modo papel (resuelvo en folio)</button></div><div class="row"><button class="ghost" id="tmBtn" onclick="BQA.pomo()">⏱ 25</button><span class="small">Temporizador de 25 min: cuando suene, 5 min de descanso.</span></div></section>
    <ol class="plan">${PLAN.map((p,k)=>`<li class="${save.plan[k]?'dn':k===n?'now':''}"><button onclick="BQA.planGo(${k})"><span>${save.plan[k]?'✔':p.i}</span> ${esc(p.t)} <small>${p.m} min</small></button></li>`).join('')}</ol>
    <details class="rules"><summary>Más opciones (todos los casos, temas, rondas)</summary><div id="moreBox"></div></details>`);
   $('moreBox').innerHTML = homeFull(); pomoTick(); hud();
@@ -354,6 +355,7 @@ function reset(){ if(confirm('¿Borrar todo el progreso y los fallos guardados?'
 
 // ---------- API para los botones ----------
 window.BQA = {
+  paper:paperHome, paperList, paperOpen, paperHint, paperCorrect, paperTick, paperAll, paperNext, paperExam, paperPrint,
   home, planGo, pomo:pomoToggle, planSkip(i){ save.plan[i]=true; persist(); home(); }, unit:unitView, campaign, review, exam, casePart, cheats, progress, reset, check, selfOk,
   quit(){ if(!run || confirm('¿Salir? Lo contestado ya cuenta para el progreso.')) home(); },
   opt(i){ if(st.answered) return; if(st.q.type==='multi'){ st.sel.has(i)?st.sel.delete(i):st.sel.add(i); } else { st.sel = new Set([i]); }
